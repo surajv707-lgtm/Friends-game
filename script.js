@@ -323,167 +323,747 @@ function createUser(name, email, password) {
 
 
 /* =========================================================
-   10. AUTHENTICATION
+   10. AUTHENTICATION - FIXED VERSION
    ========================================================= */
 
 function setupAuthentication() {
-    const signInTab = $("#signInTab");
-    const signUpTab = $("#signUpTab");
 
-    const signInForm = $("#signInForm");
-    const signUpForm = $("#signUpForm");
+    // -----------------------------
+    // SIGN IN / SIGN UP TABS
+    // -----------------------------
 
+    const signInTab =
+        document.getElementById("signInTab");
+
+    const signUpTab =
+        document.getElementById("signUpTab");
+
+    const signInForm =
+        document.getElementById("signInForm");
+
+    const signUpForm =
+        document.getElementById("signUpForm");
+
+
+    // SIGN IN TAB
     if (signInTab) {
-        signInTab.addEventListener("click", () => {
-            signInTab.classList.add("active");
-            signUpTab?.classList.remove("active");
+        signInTab.addEventListener("click", function (e) {
 
-            showElement(signInForm);
-            hideElement(signUpForm);
+            e.preventDefault();
+
+            signInTab.classList.add("active");
+
+            if (signUpTab) {
+                signUpTab.classList.remove("active");
+            }
+
+            if (signInForm) {
+                signInForm.classList.remove("hidden");
+                signInForm.style.display = "";
+            }
+
+            if (signUpForm) {
+                signUpForm.classList.add("hidden");
+                signUpForm.style.display = "none";
+            }
         });
     }
 
-    if (signUpTab) {
-        signUpTab.addEventListener("click", () => {
-            signUpTab.classList.add("active");
-            signInTab?.classList.remove("active");
 
-            showElement(signUpForm);
-            hideElement(signInForm);
+    // SIGN UP TAB
+    if (signUpTab) {
+        signUpTab.addEventListener("click", function (e) {
+
+            e.preventDefault();
+
+            signUpTab.classList.add("active");
+
+            if (signInTab) {
+                signInTab.classList.remove("active");
+            }
+
+            if (signUpForm) {
+                signUpForm.classList.remove("hidden");
+                signUpForm.style.display = "";
+            }
+
+            if (signInForm) {
+                signInForm.classList.add("hidden");
+                signInForm.style.display = "none";
+            }
 
             generateCaptcha();
         });
     }
 
+
+    // -----------------------------
+    // SIGN IN FORM
+    // -----------------------------
+
     if (signInForm) {
-        signInForm.addEventListener("submit", handleSignIn);
+
+        signInForm.addEventListener(
+            "submit",
+            function (event) {
+
+                event.preventDefault();
+
+                const emailElement =
+                    document.getElementById("signinEmail");
+
+                const passwordElement =
+                    document.getElementById("signinPassword");
+
+                if (!emailElement || !passwordElement) {
+                    showToast(
+                        "Login fields are missing from the page.",
+                        "error"
+                    );
+
+                    console.error(
+                        "signinEmail or signinPassword not found."
+                    );
+
+                    return;
+                }
+
+                const email =
+                    emailElement.value.trim().toLowerCase();
+
+                const password =
+                    passwordElement.value;
+
+
+                if (!email) {
+                    showToast(
+                        "Please enter your email.",
+                        "error"
+                    );
+                    return;
+                }
+
+                if (!password) {
+                    showToast(
+                        "Please enter your password.",
+                        "error"
+                    );
+                    return;
+                }
+
+
+                const user =
+                    data.users.find(
+                        function (item) {
+                            return (
+                                item.email.toLowerCase() ===
+                                email
+                            );
+                        }
+                    );
+
+
+                if (!user) {
+                    showToast(
+                        "No account found with this email.",
+                        "error"
+                    );
+                    return;
+                }
+
+
+                if (user.password !== password) {
+                    showToast(
+                        "Incorrect password.",
+                        "error"
+                    );
+                    return;
+                }
+
+
+                // LOGIN SUCCESS
+                currentUserId = user.id;
+
+                localStorage.setItem(
+                    CURRENT_USER_KEY,
+                    user.id
+                );
+
+                updateStreak(user);
+
+                showApp();
+
+                showToast(
+                    `Welcome back, ${user.name}!`,
+                    "success"
+                );
+
+                playSound("success");
+            }
+        );
     }
+
+
+    // -----------------------------
+    // SIGN UP FORM
+    // -----------------------------
 
     if (signUpForm) {
-        signUpForm.addEventListener("submit", handleSignUp);
+
+        signUpForm.addEventListener(
+            "submit",
+            function (event) {
+
+                event.preventDefault();
+
+                const nameElement =
+                    document.getElementById("signupName");
+
+                const emailElement =
+                    document.getElementById("signupEmail");
+
+                const passwordElement =
+                    document.getElementById("signupPassword");
+
+
+                if (
+                    !nameElement ||
+                    !emailElement ||
+                    !passwordElement
+                ) {
+                    showToast(
+                        "Signup fields are missing from the page.",
+                        "error"
+                    );
+
+                    console.error(
+                        "Signup input IDs are missing."
+                    );
+
+                    return;
+                }
+
+
+                const name =
+                    nameElement.value.trim();
+
+                const email =
+                    emailElement.value
+                        .trim()
+                        .toLowerCase();
+
+                const password =
+                    passwordElement.value;
+
+
+                // NAME
+                if (name.length < 2) {
+                    showToast(
+                        "Please enter your name.",
+                        "error"
+                    );
+                    return;
+                }
+
+
+                // EMAIL
+                if (
+                    !email ||
+                    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+                ) {
+                    showToast(
+                        "Please enter a valid email.",
+                        "error"
+                    );
+                    return;
+                }
+
+
+                // EXISTING ACCOUNT
+                if (findUserByEmail(email)) {
+                    showToast(
+                        "This email is already registered.",
+                        "error"
+                    );
+                    return;
+                }
+
+
+                // PASSWORD
+                const passwordErrors =
+                    validatePassword(password);
+
+
+                if (passwordErrors.length > 0) {
+
+                    showToast(
+                        "Password needs " +
+                        passwordErrors.join(", ") +
+                        ".",
+                        "error"
+                    );
+
+                    return;
+                }
+
+
+                // CAPTCHA
+                if (!verifyCaptcha()) {
+
+                    showToast(
+                        "Incorrect CAPTCHA answer.",
+                        "error"
+                    );
+
+                    generateCaptcha();
+
+                    return;
+                }
+
+
+                // CREATE USER
+                const user =
+                    createUser(
+                        name,
+                        email,
+                        password
+                    );
+
+
+                currentUserId =
+                    user.id;
+
+
+                localStorage.setItem(
+                    CURRENT_USER_KEY,
+                    user.id
+                );
+
+
+                updateStreak(user);
+
+                showApp();
+
+
+                showToast(
+                    `Welcome to FriendZone, ${user.name}!`,
+                    "success"
+                );
+
+
+                playSound("success");
+
+                launchConfetti();
+            }
+        );
     }
 
-    const forgotPassword = $("#forgotPassword");
 
-    if (forgotPassword) {
-        forgotPassword.addEventListener("click", showForgotPassword);
+    // -----------------------------
+    // FORGOT PASSWORD
+    // -----------------------------
+
+    const forgotButton =
+        document.getElementById("forgotPassword");
+
+
+    if (forgotButton) {
+
+        forgotButton.addEventListener(
+            "click",
+            function (event) {
+
+                event.preventDefault();
+
+                openForgotPasswordModal();
+            }
+        );
     }
 
+
+    // Generate CAPTCHA initially
     generateCaptcha();
 }
 
-function handleSignUp(event) {
-    event.preventDefault();
 
-    const nameInput = $("#signupName");
-    const emailInput = $("#signupEmail");
-    const passwordInput = $("#signupPassword");
+/* =========================================================
+   CAPTCHA - FIXED
+   ========================================================= */
 
-    const name = nameInput?.value.trim();
-    const email = emailInput?.value.trim();
-    const password = passwordInput?.value;
+function generateCaptcha() {
 
-    if (!name || name.length < 2) {
-        showToast("Please enter your name.", "error");
-        return;
+    const number1 =
+        Math.floor(Math.random() * 9) + 1;
+
+    const number2 =
+        Math.floor(Math.random() * 9) + 1;
+
+
+    captchaAnswer =
+        number1 + number2;
+
+
+    const question =
+        document.getElementById(
+            "captchaQuestion"
+        );
+
+
+    if (question) {
+        question.textContent =
+            `${number1} + ${number2} = ?`;
     }
 
-    if (!email || !email.includes("@")) {
-        showToast("Please enter a valid email.", "error");
-        return;
+
+    const input =
+        document.getElementById(
+            "captchaInput"
+        );
+
+
+    if (input) {
+        input.value = "";
+    }
+}
+
+
+function verifyCaptcha() {
+
+    const input =
+        document.getElementById(
+            "captchaInput"
+        );
+
+
+    if (!input) {
+
+        console.error(
+            "captchaInput was not found."
+        );
+
+        return false;
     }
 
-    if (findUserByEmail(email)) {
-        showToast("This email is already registered.", "error");
-        return;
+
+    return (
+        Number(input.value) ===
+        Number(captchaAnswer)
+    );
+}
+
+
+/* =========================================================
+   PASSWORD VALIDATION
+   ========================================================= */
+
+function validatePassword(password) {
+
+    const errors = [];
+
+
+    if (password.length < 8) {
+        errors.push(
+            "at least 8 characters"
+        );
     }
 
-    const passwordErrors = validatePassword(password);
 
-    if (passwordErrors.length) {
+    if (!/[A-Z]/.test(password)) {
+        errors.push(
+            "one capital letter"
+        );
+    }
+
+
+    if (!/[0-9]/.test(password)) {
+        errors.push(
+            "one number"
+        );
+    }
+
+
+    return errors;
+}
+
+
+/* =========================================================
+   FORGOT PASSWORD - COMPLETELY FIXED
+   ========================================================= */
+
+function openForgotPasswordModal() {
+
+    const modal =
+        document.getElementById(
+            "generalModal"
+        );
+
+
+    if (!modal) {
+
         showToast(
-            `Password needs ${passwordErrors.join(", ")}.`,
+            "Password reset window is missing.",
             "error"
         );
+
+        console.error(
+            "generalModal not found."
+        );
+
         return;
     }
 
-    if (!verifyCaptcha()) {
-        showToast("CAPTCHA answer is incorrect.", "error");
-        generateCaptcha();
-        return;
+
+    const title =
+        modal.querySelector(
+            ".modal-title"
+        );
+
+
+    const body =
+        modal.querySelector(
+            ".modal-body"
+        );
+
+
+    if (title) {
+        title.textContent =
+            "Reset Password";
     }
 
-    const user = createUser(name, email, password);
 
-    currentUserId = user.id;
-    localStorage.setItem(CURRENT_USER_KEY, user.id);
+    if (body) {
 
-    updateStreak(user);
+        body.innerHTML = `
 
-    showApp();
+            <div class="reset-password-box">
 
-    showToast(
-        `Welcome to FriendZone, ${user.name}!`,
-        "success"
-    );
+                <p>
+                    Enter your registered email address.
+                </p>
 
-    launchConfetti();
-}
+                <input
+                    id="resetEmail"
+                    class="input"
+                    type="email"
+                    placeholder="Registered email"
+                    autocomplete="email"
+                >
 
-function handleSignIn(event) {
-    event.preventDefault();
+                <button
+                    type="button"
+                    class="btn btn-primary full-width"
+                    id="verifyResetEmail"
+                >
+                    Verify Email
+                </button>
 
-    const email = $("#signinEmail")?.value.trim();
-    const password = $("#signinPassword")?.value;
 
-    const user = findUserByEmail(email);
+                <div
+                    id="resetStepTwo"
+                    class="hidden"
+                    style="display:none;"
+                >
 
-    if (!user) {
-        showToast("No account found with this email.", "error");
-        return;
+                    <br>
+
+                    <input
+                        id="newResetPassword"
+                        class="input"
+                        type="password"
+                        placeholder="New password"
+                        autocomplete="new-password"
+                    >
+
+                    <br>
+
+                    <button
+                        type="button"
+                        class="btn btn-primary full-width"
+                        id="resetPasswordBtn"
+                    >
+                        Reset Password
+                    </button>
+
+                </div>
+
+            </div>
+        `;
     }
 
-    if (user.password !== password) {
-        showToast("Incorrect password.", "error");
-        return;
+
+    openModal(modal);
+
+
+    // VERIFY EMAIL
+    const verifyButton =
+        document.getElementById(
+            "verifyResetEmail"
+        );
+
+
+    if (verifyButton) {
+
+        verifyButton.onclick =
+            function () {
+
+                const emailElement =
+                    document.getElementById(
+                        "resetEmail"
+                    );
+
+
+                const email =
+                    emailElement.value
+                        .trim()
+                        .toLowerCase();
+
+
+                if (!email) {
+
+                    showToast(
+                        "Please enter your email.",
+                        "error"
+                    );
+
+                    return;
+                }
+
+
+                const user =
+                    findUserByEmail(email);
+
+
+                if (!user) {
+
+                    showToast(
+                        "This email is not registered.",
+                        "error"
+                    );
+
+                    return;
+                }
+
+
+                // EMAIL FOUND
+                const stepTwo =
+                    document.getElementById(
+                        "resetStepTwo"
+                    );
+
+
+                if (stepTwo) {
+
+                    stepTwo.classList.remove(
+                        "hidden"
+                    );
+
+                    stepTwo.style.display =
+                        "block";
+                }
+
+
+                verifyButton.disabled =
+                    true;
+
+                verifyButton.textContent =
+                    "Email Verified ✓";
+
+
+                showToast(
+                    "Email verified. Enter your new password.",
+                    "success"
+                );
+            };
     }
 
-    currentUserId = user.id;
 
-    localStorage.setItem(
-        CURRENT_USER_KEY,
-        user.id
-    );
+    // RESET PASSWORD
+    const resetButton =
+        document.getElementById(
+            "resetPasswordBtn"
+        );
 
-    updateStreak(user);
 
-    showApp();
+    if (resetButton) {
 
-    showToast(
-        `Welcome back, ${user.name}!`,
-        "success"
-    );
-}
+        resetButton.onclick =
+            function () {
 
-function showApp() {
-    const authScreen = $("#authScreen");
-    const appShell = $("#appShell");
+                const emailElement =
+                    document.getElementById(
+                        "resetEmail"
+                    );
 
-    hideElement(authScreen);
-    showElement(appShell);
 
-    renderEverything();
-}
+                const passwordElement =
+                    document.getElementById(
+                        "newResetPassword"
+                    );
 
-function showAuth() {
-    const authScreen = $("#authScreen");
-    const appShell = $("#appShell");
 
-    showElement(authScreen);
-    hideElement(appShell);
+                const email =
+                    emailElement.value
+                        .trim()
+                        .toLowerCase();
 
-    generateCaptcha();
+
+                const newPassword =
+                    passwordElement.value;
+
+
+                const user =
+                    findUserByEmail(email);
+
+
+                if (!user) {
+
+                    showToast(
+                        "Please verify your registered email first.",
+                        "error"
+                    );
+
+                    return;
+                }
+
+
+                const errors =
+                    validatePassword(
+                        newPassword
+                    );
+
+
+                if (errors.length > 0) {
+
+                    showToast(
+                        "Password needs " +
+                        errors.join(", ") +
+                        ".",
+                        "error"
+                    );
+
+                    return;
+                }
+
+
+                user.password =
+                    newPassword;
+
+
+                saveData();
+
+
+                closeModal(modal);
+
+
+                showToast(
+                    "Password successfully reset! You can now sign in.",
+                    "success"
+                );
+
+
+                playSound("success");
+            };
+    }
 }
 
 
