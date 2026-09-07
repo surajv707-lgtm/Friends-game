@@ -1,1550 +1,1681 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+  <meta charset="UTF-8" />
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  />
 
-    <meta
-        name="theme-color"
-        content="#0b0d17"
-    >
+  <meta
+    name="description"
+    content="FriendZone — Connect, build friendships and create your own circle."
+  />
 
-    <title>FriendZone — Connect • Play • Belong</title>
+  <meta name="theme-color" content="#0b0b12" />
 
-    <link
-        rel="preconnect"
-        href="https://fonts.googleapis.com"
-    >
+  <title>FriendZone</title>
 
-    <link
-        rel="preconnect"
-        href="https://fonts.gstatic.com"
-        crossorigin
-    >
+  <!-- =========================
+       FONTS
+  ========================== -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap"
-        rel="stylesheet"
-    >
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
 
-    <link
-        rel="stylesheet"
-        href="style.css"
-    >
+  <!-- =========================
+       SUPABASE
+  ========================== -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- =========================
+       WEBSITE CSS
+  ========================== -->
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
 
-<!-- =====================================================
-     TOAST
-===================================================== -->
+  <!-- =====================================================
+       LOADING SCREEN
+  ====================================================== -->
 
-<div id="toast" class="toast"></div>
+  <div id="appLoader" class="app-loader">
 
+    <div class="loader-brand">
+      <div class="loader-logo">FZ</div>
 
-<!-- =====================================================
-     AUTH SCREEN
-===================================================== -->
+      <div class="loader-spinner"></div>
 
-<section id="authScreen" class="auth-screen">
-
-    <div class="auth-background">
-        <div class="orb orb-one"></div>
-        <div class="orb orb-two"></div>
-        <div class="orb orb-three"></div>
+      <h2>FriendZone</h2>
+      <p>Connecting your circle...</p>
     </div>
 
-    <div class="auth-card">
+  </div>
 
-        <div class="brand auth-brand">
-            <div class="brand-icon">FZ</div>
 
-            <div>
-                <div class="brand-name">FriendZone</div>
-                <div class="brand-tagline">
-                    Connect • Play • Belong
-                </div>
-            </div>
+  <!-- =====================================================
+       AUTHENTICATION
+  ====================================================== -->
+
+  <section id="authScreen" class="auth-screen hidden">
+
+    <div class="auth-bg">
+
+      <div class="bg-orb orb-1"></div>
+      <div class="bg-orb orb-2"></div>
+      <div class="bg-orb orb-3"></div>
+
+    </div>
+
+
+    <div class="auth-container">
+
+      <!-- BRAND -->
+
+      <div class="auth-brand">
+
+        <div class="brand-logo">
+          FZ
         </div>
 
-        <div class="auth-heading">
-            <h1 id="authTitle">Welcome Back</h1>
+        <div>
+          <h1>FriendZone</h1>
+          <p>Connect. Share. Belong.</p>
+        </div>
 
-            <p id="authSubtitle">
-                Sign in to continue your FriendZone journey.
+      </div>
+
+
+      <!-- AUTH CARD -->
+
+      <div class="auth-card">
+
+
+        <!-- =========================
+             LOGIN
+        ========================== -->
+
+        <div id="loginPanel" class="auth-panel">
+
+          <div class="auth-heading">
+
+            <span class="eyebrow">
+              WELCOME BACK
+            </span>
+
+            <h2>
+              Good to see you again 👋
+            </h2>
+
+            <p>
+              Login to continue to your FriendZone.
             </p>
-        </div>
 
-        <div class="auth-tabs">
-
-            <button
-                id="signInTab"
-                class="auth-tab active"
-                type="button"
-            >
-                Sign In
-            </button>
-
-            <button
-                id="signUpTab"
-                class="auth-tab"
-                type="button"
-            >
-                Sign Up
-            </button>
-
-        </div>
+          </div>
 
 
-        <!-- SIGN IN -->
+          <form id="loginForm">
 
-        <form id="signInForm" class="auth-form">
+            <div class="input-group">
 
-            <label class="input-label">
+              <label for="loginEmail">
                 Email
-            </label>
+              </label>
 
-            <input
-                id="signinEmail"
-                class="input"
+              <input
                 type="email"
+                id="loginEmail"
                 placeholder="Enter your email"
                 autocomplete="email"
                 required
-            >
+              />
 
-            <label class="input-label">
-                Password
-            </label>
-
-            <input
-                id="signinPassword"
-                class="input"
-                type="password"
-                placeholder="Enter your password"
-                autocomplete="current-password"
-                required
-            >
-
-            <button
-                id="signInButton"
-                class="btn btn-primary auth-submit"
-                type="submit"
-            >
-                Sign In
-            </button>
-
-            <button
-                id="forgotPassword"
-                class="forgot-button"
-                type="button"
-            >
-                Forgot Password?
-            </button>
-
-        </form>
-
-
-        <!-- SIGN UP -->
-
-        <form
-            id="signUpForm"
-            class="auth-form hidden"
-        >
-
-            <label class="input-label">
-                Name
-            </label>
-
-            <input
-                id="signupName"
-                class="input"
-                type="text"
-                placeholder="Enter your name"
-                autocomplete="name"
-                required
-            >
-
-            <label class="input-label">
-                Email
-            </label>
-
-            <input
-                id="signupEmail"
-                class="input"
-                type="email"
-                placeholder="Enter your email"
-                autocomplete="email"
-                required
-            >
-
-            <label class="input-label">
-                Password
-            </label>
-
-            <input
-                id="signupPassword"
-                class="input"
-                type="password"
-                placeholder="8+ chars, capital & number"
-                autocomplete="new-password"
-                required
-            >
-
-            <div class="password-hint">
-                Minimum 8 characters • 1 capital letter • 1 number
             </div>
 
-            <div class="captcha-box">
 
-                <div class="captcha-question">
-                    <span id="captchaQuestion">-- + -- = ?</span>
-                </div>
+            <div class="input-group">
+
+              <label for="loginPassword">
+                Password
+              </label>
+
+              <div class="password-field">
 
                 <input
-                    id="captchaInput"
-                    class="input"
-                    type="number"
-                    placeholder="Answer"
-                    required
-                >
+                  type="password"
+                  id="loginPassword"
+                  placeholder="Enter your password"
+                  autocomplete="current-password"
+                  required
+                />
 
                 <button
-                    id="refreshCaptcha"
-                    class="captcha-refresh"
-                    type="button"
-                    title="New CAPTCHA"
+                  type="button"
+                  class="password-toggle"
+                  data-target="loginPassword"
                 >
-                    ↻
+                  👁
                 </button>
+
+              </div>
 
             </div>
 
+
             <button
-                id="signUpButton"
-                class="btn btn-primary auth-submit"
-                type="submit"
+              type="submit"
+              class="primary-btn full-width"
             >
-                Create Account
+              <span>Login</span>
             </button>
 
-        </form>
+          </form>
 
-        <div class="auth-bottom">
-            Your FriendZone journey starts here ✨
+
+          <div class="auth-divider">
+            <span>OR</span>
+          </div>
+
+
+          <button
+            id="showSignupBtn"
+            class="secondary-btn full-width"
+          >
+            Create New Account
+          </button>
+
         </div>
+
+
+        <!-- =========================
+             SIGN UP
+        ========================== -->
+
+        <div id="signupPanel" class="auth-panel hidden">
+
+          <div class="auth-heading">
+
+            <span class="eyebrow">
+              JOIN FRIENDZONE
+            </span>
+
+            <h2>
+              Create your account ✨
+            </h2>
+
+            <p>
+              Start building your own circle.
+            </p>
+
+          </div>
+
+
+          <form id="signupForm">
+
+            <div class="input-group">
+
+              <label for="signupName">
+                Full Name
+              </label>
+
+              <input
+                type="text"
+                id="signupName"
+                placeholder="Enter your full name"
+                maxlength="60"
+                required
+              />
+
+            </div>
+
+
+            <div class="input-group">
+
+              <label for="signupUsername">
+                Username
+              </label>
+
+              <input
+                type="text"
+                id="signupUsername"
+                placeholder="Choose a username"
+                maxlength="30"
+                required
+              />
+
+            </div>
+
+
+            <div class="input-group">
+
+              <label for="signupEmail">
+                Email
+              </label>
+
+              <input
+                type="email"
+                id="signupEmail"
+                placeholder="Enter your email"
+                autocomplete="email"
+                required
+              />
+
+            </div>
+
+
+            <div class="input-group">
+
+              <label for="signupPassword">
+                Password
+              </label>
+
+              <div class="password-field">
+
+                <input
+                  type="password"
+                  id="signupPassword"
+                  placeholder="Create a password"
+                  minlength="6"
+                  autocomplete="new-password"
+                  required
+                />
+
+                <button
+                  type="button"
+                  class="password-toggle"
+                  data-target="signupPassword"
+                >
+                  👁
+                </button>
+
+              </div>
+
+            </div>
+
+
+            <button
+              type="submit"
+              class="primary-btn full-width"
+            >
+              Create Account
+            </button>
+
+          </form>
+
+
+          <button
+            id="showLoginBtn"
+            class="text-btn"
+          >
+            ← Already have an account? Login
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <p class="auth-footer">
+        Your friends. Your circle. Your FriendZone.
+      </p>
 
     </div>
 
-</section>
+  </section>
 
 
-<!-- =====================================================
-     APP
-===================================================== -->
 
-<div id="appShell" class="app-shell hidden">
+  <!-- =====================================================
+       MAIN APPLICATION
+  ====================================================== -->
+
+  <div id="mainApp" class="main-app hidden">
 
 
     <!-- =================================================
-         NAVBAR
-    ================================================= -->
+         SIDEBAR
+    ================================================== -->
 
-    <header class="topbar">
-
-        <div class="topbar-inner">
-
-            <button
-                class="brand brand-button"
-                data-go="homeSection"
-                type="button"
-            >
-
-                <div class="brand-icon">FZ</div>
-
-                <div>
-                    <div class="brand-name">FriendZone</div>
-
-                    <div class="brand-tagline">
-                        Connect • Play • Belong
-                    </div>
-                </div>
-
-            </button>
+    <aside id="sidebar" class="sidebar">
 
 
-            <nav id="mainNav" class="main-nav">
+      <!-- SIDEBAR HEADER -->
 
-                <button
-                    class="nav-link active"
-                    data-section="homeSection"
-                    type="button"
-                >
-                    🏠 Home
-                </button>
+      <div class="sidebar-header">
 
-                <button
-                    class="nav-link"
-                    data-section="friendsSection"
-                    type="button"
-                >
-                    👥 Friends
-                    <span
-                        id="friendRequestBadge"
-                        class="nav-badge hidden"
-                    >
-                        0
-                    </span>
-                </button>
+        <div class="brand">
 
-                <button
-                    class="nav-link"
-                    data-section="gamesSection"
-                    type="button"
-                >
-                    🎮 Games
-                </button>
+          <div class="brand-logo">
+            FZ
+          </div>
 
-                <button
-                    class="nav-link"
-                    data-section="leaderboardSection"
-                    type="button"
-                >
-                    🏆 Leaderboard
-                </button>
+          <div class="brand-text">
 
-                <button
-                    class="nav-link"
-                    data-section="thoughtsSection"
-                    type="button"
-                >
-                    💭 Thoughts
-                </button>
+            <h1>FriendZone</h1>
 
-                <button
-                    class="nav-link"
-                    data-section="roomSection"
-                    type="button"
-                >
-                    🚪 Friend Room
-                </button>
+            <span>
+              Your people. Your zone.
+            </span>
 
-                <button
-                    class="nav-link"
-                    data-section="profileSection"
-                    type="button"
-                >
-                    👤 Profile
-                </button>
-
-            </nav>
-
-
-            <div class="topbar-actions">
-
-                <button
-                    id="themeButton"
-                    class="icon-button"
-                    type="button"
-                    title="Toggle theme"
-                >
-                    ☀️
-                </button>
-
-                <button
-                    id="soundButton"
-                    class="icon-button"
-                    type="button"
-                    title="Toggle sound"
-                >
-                    🔊
-                </button>
-
-                <button
-                    id="menuButton"
-                    class="menu-button"
-                    type="button"
-                    aria-label="Open menu"
-                >
-                    ☰
-                </button>
-
-            </div>
+          </div>
 
         </div>
 
-    </header>
+
+        <button
+          id="closeSidebarBtn"
+          class="mobile-close-btn"
+          aria-label="Close menu"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <!-- NAVIGATION -->
+
+      <nav class="main-navigation">
+
+
+        <button
+          class="nav-item active"
+          data-page="homePage"
+        >
+
+          <span class="nav-icon">
+            ⌂
+          </span>
+
+          <span class="nav-label">
+            Home
+          </span>
+
+        </button>
+
+
+        <button
+          class="nav-item"
+          data-page="friendsPage"
+        >
+
+          <span class="nav-icon">
+            👥
+          </span>
+
+          <span class="nav-label">
+            Friends
+          </span>
+
+          <span
+            id="friendsBadge"
+            class="nav-badge hidden"
+          >
+            0
+          </span>
+
+        </button>
+
+
+        <button
+          class="nav-item"
+          data-page="requestsPage"
+        >
+
+          <span class="nav-icon">
+            ✉
+          </span>
+
+          <span class="nav-label">
+            Requests
+          </span>
+
+          <span
+            id="requestsBadge"
+            class="nav-badge hidden"
+          >
+            0
+          </span>
+
+        </button>
+
+
+        <button
+          class="nav-item"
+          data-page="bestFriendsPage"
+        >
+
+          <span class="nav-icon">
+            ★
+          </span>
+
+          <span class="nav-label">
+            Best Friends
+          </span>
+
+        </button>
+
+
+        <button
+          class="nav-item"
+          data-page="addFriendPage"
+        >
+
+          <span class="nav-icon">
+            ＋
+          </span>
+
+          <span class="nav-label">
+            Add Friend
+          </span>
+
+        </button>
+
+
+        <button
+          class="nav-item"
+          data-page="profilePage"
+        >
+
+          <span class="nav-icon">
+            ◯
+          </span>
+
+          <span class="nav-label">
+            Profile
+          </span>
+
+        </button>
+
+      </nav>
+
+
+      <!-- SIDEBAR USER -->
+
+      <div class="sidebar-bottom">
+
+        <div class="sidebar-user">
+
+          <div
+            id="sidebarAvatar"
+            class="avatar"
+          >
+            U
+          </div>
+
+
+          <div class="sidebar-user-info">
+
+            <strong id="sidebarUserName">
+              User
+            </strong>
+
+            <span id="sidebarFriendId">
+              FZ-000000
+            </span>
+
+          </div>
+
+        </div>
+
+
+        <button
+          id="logoutBtn"
+          class="logout-btn"
+        >
+
+          <span>
+            ↪
+          </span>
+
+          Logout
+
+        </button>
+
+      </div>
+
+    </aside>
+
+
+    <!-- MOBILE SIDEBAR OVERLAY -->
+
+    <div
+      id="sidebarOverlay"
+      class="sidebar-overlay"
+    ></div>
+
 
 
     <!-- =================================================
-         MAIN
-    ================================================= -->
+         CONTENT
+    ================================================== -->
 
-    <main class="main-content">
+    <main class="content-area">
 
 
-        <!-- =============================================
-             HOME
-        ============================================== -->
+      <!-- TOP HEADER -->
 
-        <section
-            id="homeSection"
-            class="app-section active"
-        >
+      <header class="top-header">
 
-            <div class="hero-section">
-
-                <div class="hero-content">
-
-                    <div class="eyebrow">
-                        ✨ YOUR SOCIAL GAMING SPACE
-                    </div>
-
-                    <h1>
-                        Welcome to
-                        <span>FriendZone</span>
-                    </h1>
-
-                    <p>
-                        Connect with real friends, play games,
-                        earn XP and build your own circle.
-                    </p>
-
-                    <div class="hero-actions">
-
-                        <button
-                            class="btn btn-primary"
-                            data-go="friendsSection"
-                            type="button"
-                        >
-                            👥 Find Friends
-                        </button>
-
-                        <button
-                            class="btn btn-secondary"
-                            data-go="gamesSection"
-                            type="button"
-                        >
-                            🎮 Play Games
-                        </button>
-
-                    </div>
-
-                </div>
-
-
-                <div class="hero-visual">
-
-                    <div class="hero-orbit orbit-one"></div>
-                    <div class="hero-orbit orbit-two"></div>
-
-                    <div class="hero-logo-card">
-                        <div class="hero-logo">FZ</div>
-                        <div>FriendZone</div>
-                        <span>Connect • Play • Belong</span>
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div class="stats-grid">
-
-                <div class="stat-card">
-                    <div class="stat-icon">👥</div>
-
-                    <div>
-                        <span>Friends</span>
-                        <strong id="friendCount">0</strong>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">💖</div>
-
-                    <div>
-                        <span>Best Friends</span>
-                        <strong id="bestFriendCount">0</strong>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">⚡</div>
-
-                    <div>
-                        <span>Total XP</span>
-                        <strong id="xpCount">0</strong>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">🔥</div>
-
-                    <div>
-                        <span>Streak</span>
-                        <strong id="streakCount">1</strong>
-                    </div>
-                </div>
-
-            </div>
-
-
-            <div class="section-heading">
-
-                <div>
-                    <div class="eyebrow">QUICK ACCESS</div>
-
-                    <h2>
-                        Your FriendZone
-                    </h2>
-                </div>
-
-            </div>
-
-
-            <div class="quick-grid">
-
-                <button
-                    class="quick-card"
-                    data-go="friendsSection"
-                    type="button"
-                >
-                    <span class="quick-icon">👥</span>
-
-                    <strong>Friends</strong>
-
-                    <span>
-                        Connect using Friend IDs
-                    </span>
-                </button>
-
-                <button
-                    class="quick-card"
-                    data-go="gamesSection"
-                    type="button"
-                >
-                    <span class="quick-icon">🎮</span>
-
-                    <strong>Games</strong>
-
-                    <span>
-                        Play solo or with friends
-                    </span>
-                </button>
-
-                <button
-                    class="quick-card"
-                    data-go="leaderboardSection"
-                    type="button"
-                >
-                    <span class="quick-icon">🏆</span>
-
-                    <strong>Leaderboard</strong>
-
-                    <span>
-                        Compete for XP
-                    </span>
-                </button>
-
-                <button
-                    class="quick-card"
-                    data-go="roomSection"
-                    type="button"
-                >
-                    <span class="quick-icon">🚪</span>
-
-                    <strong>Friend Room</strong>
-
-                    <span>
-                        Create or join a room
-                    </span>
-                </button>
-
-            </div>
-
-        </section>
-
-
-        <!-- =============================================
-             FRIENDS
-        ============================================== -->
-
-        <section
-            id="friendsSection"
-            class="app-section"
-        >
-
-            <div class="page-header">
-
-                <div>
-                    <div class="eyebrow">SOCIAL</div>
-
-                    <h1>Friends</h1>
-
-                    <p>
-                        Build your real FriendZone.
-                    </p>
-                </div>
-
-                <div class="count-pill">
-                    <span id="myFriendsCount">0</span>
-                    Friends
-                </div>
-
-            </div>
-
-
-            <div class="friend-add-card">
-
-                <div class="card-icon">➕</div>
-
-                <div class="card-content">
-
-                    <h2>Add a Friend</h2>
-
-                    <p>
-                        Enter your friend's unique Friend ID.
-                    </p>
-
-                    <div class="friend-id-input-row">
-
-                        <input
-                            id="friendIdInput"
-                            class="input"
-                            type="text"
-                            placeholder="Example: FZ-AB123456"
-                            autocomplete="off"
-                        >
-
-                        <button
-                            id="sendFriendRequest"
-                            class="btn btn-primary"
-                            type="button"
-                        >
-                            Send Request
-                        </button>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div class="content-grid">
-
-                <div class="content-card">
-
-                    <div class="card-header">
-
-                        <div>
-                            <h2>Friend Requests</h2>
-                            <p>Requests waiting for your response.</p>
-                        </div>
-
-                        <span class="mini-icon">📨</span>
-
-                    </div>
-
-                    <div id="friendRequestsList">
-                        <div class="empty-state">
-                            <div class="empty-state-icon">📨</div>
-                            <h3>No pending requests</h3>
-                            <p>
-                                New friend requests will appear here.
-                            </p>
-                        </div>
-                    </div>
-
-                </div>
-
-
-                <div class="content-card">
-
-                    <div class="card-header">
-
-                        <div>
-                            <h2>My Friends</h2>
-                            <p>Your accepted friends.</p>
-                        </div>
-
-                        <span class="mini-icon">👥</span>
-
-                    </div>
-
-                    <div id="friendsList">
-                        <div class="empty-state">
-                            <div class="empty-state-icon">👥</div>
-                            <h3>You have 0 friends</h3>
-                            <p>
-                                Use a Friend ID to connect with someone.
-                            </p>
-                        </div>
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div class="content-card best-friends-section">
-
-                <div class="card-header">
-
-                    <div>
-                        <h2>💖 Best Friends</h2>
-
-                        <p>
-                            Optional — choose the people closest to you.
-                        </p>
-                    </div>
-
-                </div>
-
-                <div id="bestFriendsList">
-
-                    <div class="empty-state">
-
-                        <div class="empty-state-icon">💖</div>
-
-                        <h3>No Best Friends yet</h3>
-
-                        <p>
-                            Best Friends is optional.
-                        </p>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =============================================
-             GAMES
-        ============================================== -->
-
-        <section
-            id="gamesSection"
-            class="app-section"
-        >
-
-            <div class="page-header">
-
-                <div>
-                    <div class="eyebrow">PLAY & EARN</div>
-
-                    <h1>Game Zone</h1>
-
-                    <p>
-                        Choose a game and decide how you want to play.
-                    </p>
-                </div>
-
-                <div class="xp-pill">
-                    ⚡ Earn XP
-                </div>
-
-            </div>
-
-
-            <div class="game-grid">
-
-
-                <button
-                    class="game-card game-tap"
-                    data-game="tapRush"
-                    type="button"
-                >
-
-                    <div class="game-card-top">
-
-                        <div class="game-icon">
-                            ⚡
-                        </div>
-
-                        <span class="game-xp">
-                            +80 XP
-                        </span>
-
-                    </div>
-
-                    <h2>Tap Rush</h2>
-
-                    <p>
-                        Tap as fast as you can before time runs out.
-                    </p>
-
-                    <div class="game-card-footer">
-                        <span>10 seconds</span>
-                        <span>→</span>
-                    </div>
-
-                </button>
-
-
-                <button
-                    class="game-card game-memory"
-                    data-game="memoryMatch"
-                    type="button"
-                >
-
-                    <div class="game-card-top">
-
-                        <div class="game-icon">
-                            🧠
-                        </div>
-
-                        <span class="game-xp">
-                            +100 XP
-                        </span>
-
-                    </div>
-
-                    <h2>Memory Match</h2>
-
-                    <p>
-                        Match all the hidden pairs.
-                    </p>
-
-                    <div class="game-card-footer">
-                        <span>12 cards</span>
-                        <span>→</span>
-                    </div>
-
-                </button>
-
-
-                <button
-                    class="game-card game-number"
-                    data-game="numberGuess"
-                    type="button"
-                >
-
-                    <div class="game-card-top">
-
-                        <div class="game-icon">
-                            🎯
-                        </div>
-
-                        <span class="game-xp">
-                            +100 XP
-                        </span>
-
-                    </div>
-
-                    <h2>Number Guess</h2>
-
-                    <p>
-                        Find the hidden number from 1 to 100.
-                    </p>
-
-                    <div class="game-card-footer">
-                        <span>1–100</span>
-                        <span>→</span>
-                    </div>
-
-                </button>
-
-            </div>
-
-
-            <div class="game-info-card">
-
-                <div class="game-info-icon">
-                    🎮
-                </div>
-
-                <div>
-                    <h3>Play your way</h3>
-
-                    <p>
-                        Every game lets you choose between
-                        playing with friends or challenging a bot.
-                    </p>
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =============================================
-             LEADERBOARD
-        ============================================== -->
-
-        <section
-            id="leaderboardSection"
-            class="app-section"
-        >
-
-            <div class="page-header">
-
-                <div>
-                    <div class="eyebrow">COMPETE</div>
-
-                    <h1>Leaderboard</h1>
-
-                    <p>
-                        See who is earning the most XP.
-                    </p>
-                </div>
-
-            </div>
-
-
-            <div class="leaderboard-card">
-
-                <div class="leaderboard-tabs">
-
-                    <button
-                        class="leaderboard-tab active"
-                        data-type="daily"
-                        type="button"
-                    >
-                        Daily
-                    </button>
-
-                    <button
-                        class="leaderboard-tab"
-                        data-type="weekly"
-                        type="button"
-                    >
-                        Weekly
-                    </button>
-
-                    <button
-                        class="leaderboard-tab"
-                        data-type="all"
-                        type="button"
-                    >
-                        All Time
-                    </button>
-
-                </div>
-
-                <div id="leaderboardList"></div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =============================================
-             THOUGHTS
-        ============================================== -->
-
-        <section
-            id="thoughtsSection"
-            class="app-section"
-        >
-
-            <div class="page-header">
-
-                <div>
-                    <div class="eyebrow">COMMUNITY</div>
-
-                    <h1>Friends' Thoughts</h1>
-
-                    <p>
-                        Share something with your FriendZone.
-                    </p>
-                </div>
-
-            </div>
-
-
-            <div class="thought-compose content-card">
-
-                <div
-                    id="currentUserThoughtAvatar"
-                    class="thought-avatar"
-                >
-                    ?
-                </div>
-
-                <div class="thought-compose-content">
-
-                    <textarea
-                        id="thoughtInput"
-                        class="input textarea"
-                        maxlength="160"
-                        placeholder="What's on your mind?"
-                    ></textarea>
-
-                    <div class="thought-compose-footer">
-
-                        <span>
-                            Max 160 characters
-                        </span>
-
-                        <button
-                            id="postThought"
-                            class="btn btn-primary"
-                            type="button"
-                        >
-                            Post Thought
-                        </button>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div
-                id="thoughtsList"
-                class="thoughts-list"
-            ></div>
-
-        </section>
-
-
-        <!-- =============================================
-             FRIEND ROOM
-        ============================================== -->
-
-        <section
-            id="roomSection"
-            class="app-section"
-        >
-
-            <div class="page-header">
-
-                <div>
-                    <div class="eyebrow">MULTIPLAYER</div>
-
-                    <h1>Friend Room</h1>
-
-                    <p>
-                        Create a room or join your friend's room.
-                    </p>
-                </div>
-
-            </div>
-
-
-            <div class="room-grid">
-
-                <div class="content-card">
-
-                    <div class="room-big-icon">
-                        🚪
-                    </div>
-
-                    <h2>Create a Room</h2>
-
-                    <p>
-                        Create a private room and share the code
-                        with your friends.
-                    </p>
-
-                    <button
-                        id="createRoom"
-                        class="btn btn-primary"
-                        type="button"
-                    >
-                        Create Room
-                    </button>
-
-                </div>
-
-
-                <div class="content-card">
-
-                    <div class="room-big-icon">
-                        🔑
-                    </div>
-
-                    <h2>Join a Room</h2>
-
-                    <p>
-                        Enter a six-character room code.
-                    </p>
-
-                    <input
-                        id="joinRoomInput"
-                        class="input"
-                        type="text"
-                        maxlength="6"
-                        placeholder="ROOM CODE"
-                        autocomplete="off"
-                    >
-
-                    <button
-                        id="joinRoom"
-                        class="btn btn-secondary"
-                        type="button"
-                    >
-                        Join Room
-                    </button>
-
-                </div>
-
-            </div>
-
-
-            <div class="content-card active-room-card">
-
-                <div class="card-header">
-
-                    <div>
-                        <h2>Current Room</h2>
-                        <p>
-                            Your active Friend Room.
-                        </p>
-                    </div>
-
-                    <button
-                        id="copyRoomCode"
-                        class="btn btn-secondary btn-small"
-                        type="button"
-                    >
-                        Copy Code
-                    </button>
-
-                </div>
-
-                <div class="room-code-display">
-                    <span id="roomCode">------</span>
-                </div>
-
-                <div id="roomMembers"></div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =============================================
-             PROFILE
-        ============================================== -->
-
-        <section
-            id="profileSection"
-            class="app-section"
-        >
-
-            <div class="page-header">
-
-                <div>
-                    <div class="eyebrow">YOUR ACCOUNT</div>
-
-                    <h1>Profile</h1>
-
-                    <p>
-                        Your FriendZone identity and progress.
-                    </p>
-                </div>
-
-            </div>
-
-
-            <div class="profile-grid">
-
-                <div class="profile-card">
-
-                    <div
-                        id="profileAvatar"
-                        class="profile-avatar"
-                    >
-                        ?
-                    </div>
-
-                    <h2 id="profileName">
-                        User
-                    </h2>
-
-                    <p id="profileEmail">
-                        email@example.com
-                    </p>
-
-                    <div class="profile-id">
-                        <span>Friend ID</span>
-
-                        <strong id="profileFriendId">
-                            FZ--------
-                        </strong>
-                    </div>
-
-                </div>
-
-
-                <div class="profile-stats-card">
-
-                    <div class="profile-stat">
-                        <span>Level</span>
-                        <strong id="profileLevel">1</strong>
-                    </div>
-
-                    <div class="profile-stat">
-                        <span>Total XP</span>
-                        <strong id="profileXP">0</strong>
-                    </div>
-
-                    <div class="profile-stat">
-                        <span>Friends</span>
-                        <strong id="profileFriends">0</strong>
-                    </div>
-
-                    <div class="profile-stat">
-                        <span>Games</span>
-                        <strong id="profileGames">0</strong>
-                    </div>
-
-                    <div class="profile-stat">
-                        <span>Streak</span>
-                        <strong id="profileStreak">1</strong>
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div class="content-card">
-
-                <div class="card-header">
-
-                    <div>
-                        <h2>🏅 Achievements</h2>
-
-                        <p>
-                            Unlock achievements by using FriendZone.
-                        </p>
-                    </div>
-
-                </div>
-
-                <div id="achievementsList"></div>
-
-            </div>
-
-
-            <button
-                id="logoutButton"
-                class="btn btn-danger logout-button"
-                type="button"
-            >
-                Log Out
-            </button>
-
-        </section>
-
-    </main>
-
-</div>
-
-
-<!-- =====================================================
-     GAME MODE MODAL
-===================================================== -->
-
-<div
-    id="gameModeModal"
-    class="modal hidden"
->
-
-    <div class="modal-overlay"></div>
-
-    <div class="modal-panel game-mode-panel">
 
         <button
-            class="modal-close"
-            data-close-modal
-            type="button"
+          id="openSidebarBtn"
+          class="menu-btn"
+          aria-label="Open menu"
         >
-            ×
-        </button>
-
-        <div class="game-mode-header">
-
-            <div
-                id="gameModeIcon"
-                class="game-mode-icon"
-            >
-                🎮
-            </div>
-
-            <div>
-
-                <div class="eyebrow">
-                    GAME MODE
-                </div>
-
-                <h2 id="gameModeTitle">
-                    Choose How To Play
-                </h2>
-
-                <p id="gameModeDescription">
-                    Select your preferred way to play.
-                </p>
-
-            </div>
-
-        </div>
-
-
-        <div class="game-mode-options">
-
-            <button
-                id="playWithFriends"
-                class="game-mode-option friends-option"
-                type="button"
-            >
-
-                <div class="mode-option-icon">
-                    👥
-                </div>
-
-                <div class="mode-option-content">
-
-                    <h3>Play with Friends</h3>
-
-                    <p>
-                        Create or join a Friend Room
-                        and play together.
-                    </p>
-
-                    <span>
-                        ROOM MULTIPLAYER →
-                    </span>
-
-                </div>
-
-            </button>
-
-
-            <button
-                id="playWithBot"
-                class="game-mode-option bot-option"
-                type="button"
-            >
-
-                <div class="mode-option-icon">
-                    🤖
-                </div>
-
-                <div class="mode-option-content">
-
-                    <h3>Play with Bot</h3>
-
-                    <p>
-                        Challenge an AI bot and test
-                        your skills.
-                    </p>
-
-                    <span>
-                        SOLO CHALLENGE →
-                    </span>
-
-                </div>
-
-            </button>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-<!-- =====================================================
-     BOT DIFFICULTY MODAL
-===================================================== -->
-
-<div
-    id="botDifficultyModal"
-    class="modal hidden"
->
-
-    <div class="modal-overlay"></div>
-
-    <div class="modal-panel">
-
-        <button
-            class="modal-close"
-            data-close-modal
-            type="button"
-        >
-            ×
-        </button>
-
-        <div class="game-mode-header">
-
-            <div class="game-mode-icon">
-                🤖
-            </div>
-
-            <div>
-
-                <div class="eyebrow">
-                    AI CHALLENGE
-                </div>
-
-                <h2>
-                    Choose Difficulty
-                </h2>
-
-                <p>
-                    How strong should your bot be?
-                </p>
-
-            </div>
-
-        </div>
-
-
-        <div class="difficulty-options">
-
-            <button
-                class="difficulty-card easy"
-                data-difficulty="easy"
-                type="button"
-            >
-                <strong>🟢 Easy</strong>
-                <span>Relaxed challenge</span>
-            </button>
-
-            <button
-                class="difficulty-card medium"
-                data-difficulty="medium"
-                type="button"
-            >
-                <strong>🟡 Medium</strong>
-                <span>Balanced challenge</span>
-            </button>
-
-            <button
-                class="difficulty-card hard"
-                data-difficulty="hard"
-                type="button"
-            >
-                <strong>🔴 Hard</strong>
-                <span>Serious challenge</span>
-            </button>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-<!-- =====================================================
-     GENERAL MODAL
-===================================================== -->
-
-<div
-    id="generalModal"
-    class="modal hidden"
->
-
-    <div class="modal-overlay"></div>
-
-    <div class="modal-panel">
-
-        <button
-            class="modal-close"
-            data-close-modal
-            type="button"
-        >
-            ×
-        </button>
-
-        <h2 class="modal-title">
-            FriendZone
-        </h2>
-
-        <div class="modal-body"></div>
-
-    </div>
-
-</div>
-
-
-<!-- =====================================================
-     GAME ARENA
-===================================================== -->
-
-<div
-    id="gameArena"
-    class="game-arena hidden"
->
-
-    <div class="game-arena-background">
-
-        <div class="arena-orb arena-orb-one"></div>
-        <div class="arena-orb arena-orb-two"></div>
-        <div class="arena-grid"></div>
-
-    </div>
-
-
-    <header class="game-arena-topbar">
-
-        <button
-            id="exitGameArena"
-            class="arena-back-button"
-            type="button"
-        >
-            ← FriendZone
+          ☰
         </button>
 
 
-        <div class="arena-title">
+        <div class="page-title">
 
-            <span id="arenaGameIcon">🎮</span>
+          <h2 id="currentPageTitle">
+            Home
+          </h2>
 
-            <div>
-                <strong id="arenaGameTitle">
-                    Game Arena
-                </strong>
-
-                <small id="arenaGameMode">
-                    BOT MODE
-                </small>
-            </div>
+          <p id="currentPageSubtitle">
+            Welcome back to your FriendZone.
+          </p>
 
         </div>
 
 
-        <div class="arena-player-pill">
+        <div class="header-actions">
 
-            <span class="arena-avatar">
-                👤
+
+          <button
+            id="headerRequestBtn"
+            class="header-icon-btn"
+            title="Friend Requests"
+          >
+
+            ✉
+
+            <span
+              id="headerRequestBadge"
+              class="header-badge hidden"
+            >
+              0
             </span>
 
-            <span id="arenaPlayerName">
-                Player
-            </span>
+          </button>
+
+
+          <button
+            id="headerProfileBtn"
+            class="header-avatar"
+            title="Profile"
+          >
+            U
+          </button>
 
         </div>
 
-    </header>
+      </header>
 
 
-    <main class="game-arena-main">
+
+      <!-- =================================================
+           HOME
+      ================================================== -->
+
+      <section
+        id="homePage"
+        class="page active-page"
+      >
+
+
+        <!-- HERO -->
+
+        <div class="hero-card">
+
+          <div class="hero-content">
+
+            <span class="eyebrow">
+              WELCOME TO FRIENDZONE
+            </span>
+
+
+            <h1>
+              Your friends.
+              <br>
+              <span>Your world.</span>
+            </h1>
+
+
+            <p>
+              Build your own circle, connect with people using
+              Friend IDs and keep your closest friends in one place.
+            </p>
+
+
+            <div class="hero-actions">
+
+              <button
+                class="primary-btn"
+                data-go-page="addFriendPage"
+              >
+                ＋ Add Friend
+              </button>
+
+
+              <button
+                class="secondary-btn"
+                data-go-page="friendsPage"
+              >
+                View Friends
+              </button>
+
+            </div>
+
+          </div>
+
+
+          <div class="hero-decoration">
+
+            <div class="hero-orbit orbit-one"></div>
+            <div class="hero-orbit orbit-two"></div>
+
+
+            <div class="hero-center-logo">
+              FZ
+            </div>
+
+
+            <div class="floating-avatar avatar-a">
+              A
+            </div>
+
+            <div class="floating-avatar avatar-b">
+              S
+            </div>
+
+            <div class="floating-avatar avatar-c">
+              R
+            </div>
+
+            <div class="floating-avatar avatar-d">
+              M
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- STATISTICS -->
+
+        <div class="stats-grid">
+
+
+          <div class="stat-card">
+
+            <div class="stat-icon">
+              👥
+            </div>
+
+            <div>
+
+              <span>
+                Total Friends
+              </span>
+
+              <strong id="homeFriendsCount">
+                0
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div class="stat-card">
+
+            <div class="stat-icon">
+              ✉
+            </div>
+
+            <div>
+
+              <span>
+                Requests
+              </span>
+
+              <strong id="homeRequestsCount">
+                0
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div class="stat-card">
+
+            <div class="stat-icon">
+              ★
+            </div>
+
+            <div>
+
+              <span>
+                Best Friends
+              </span>
+
+              <strong id="homeBestFriendsCount">
+                0
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div class="stat-card">
+
+            <div class="stat-icon">
+              🆔
+            </div>
+
+            <div>
+
+              <span>
+                Friend ID
+              </span>
+
+              <strong id="homeFriendId">
+                FZ-000000
+              </strong>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- QUICK ACTIONS -->
+
+        <div class="section-header">
+
+          <div>
+
+            <h3>
+              Quick Actions
+            </h3>
+
+            <p>
+              Manage your FriendZone easily.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div class="quick-actions-grid">
+
+
+          <button
+            class="quick-action-card"
+            data-go-page="addFriendPage"
+          >
+
+            <div class="quick-icon">
+              ＋
+            </div>
+
+            <div>
+
+              <strong>
+                Add a Friend
+              </strong>
+
+              <span>
+                Use their Friend ID
+              </span>
+
+            </div>
+
+            <span class="arrow">
+              →
+            </span>
+
+          </button>
+
+
+          <button
+            class="quick-action-card"
+            data-go-page="requestsPage"
+          >
+
+            <div class="quick-icon">
+              ✉
+            </div>
+
+            <div>
+
+              <strong>
+                Friend Requests
+              </strong>
+
+              <span>
+                Accept or reject requests
+              </span>
+
+            </div>
+
+            <span class="arrow">
+              →
+            </span>
+
+          </button>
+
+
+          <button
+            class="quick-action-card"
+            data-go-page="bestFriendsPage"
+          >
+
+            <div class="quick-icon">
+              ★
+            </div>
+
+            <div>
+
+              <strong>
+                Best Friends
+              </strong>
+
+              <span>
+                Manage your closest people
+              </span>
+
+            </div>
+
+            <span class="arrow">
+              →
+            </span>
+
+          </button>
+
+        </div>
+
+
+
+        <!-- RECENT FRIENDS -->
+
+        <div class="section-header friends-section-header">
+
+          <div>
+
+            <h3>
+              Recent Friends
+            </h3>
+
+            <p>
+              Your newest connections.
+            </p>
+
+          </div>
+
+
+          <button
+            class="text-btn"
+            data-go-page="friendsPage"
+          >
+            View all →
+          </button>
+
+        </div>
+
 
         <div
-            id="gameArenaContent"
-            class="game-arena-content"
-        ></div>
+          id="recentFriendsContainer"
+          class="friends-preview-grid"
+        >
+
+          <div class="empty-state compact">
+
+            <div class="empty-icon">
+              👥
+            </div>
+
+            <h4>
+              No friends yet
+            </h4>
+
+            <p>
+              Add your first friend using their Friend ID.
+            </p>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+
+      <!-- =================================================
+           FRIENDS
+      ================================================== -->
+
+      <section
+        id="friendsPage"
+        class="page"
+      >
+
+        <div class="page-heading-row">
+
+          <div>
+
+            <span class="eyebrow">
+              YOUR CIRCLE
+            </span>
+
+            <h2>
+              Friends
+            </h2>
+
+            <p>
+              Your accepted friendships appear here.
+            </p>
+
+          </div>
+
+
+          <button
+            class="primary-btn"
+            data-go-page="addFriendPage"
+          >
+            ＋ Add Friend
+          </button>
+
+        </div>
+
+
+        <div class="search-bar-wrapper">
+
+          <span class="search-icon">
+            ⌕
+          </span>
+
+          <input
+            type="search"
+            id="friendsSearch"
+            placeholder="Search your friends..."
+            autocomplete="off"
+          />
+
+        </div>
+
+
+        <div
+          id="friendsContainer"
+          class="friends-grid"
+        >
+
+          <div class="empty-state">
+
+            <div class="empty-icon">
+              👥
+            </div>
+
+            <h3>
+              Your friend list is empty
+            </h3>
+
+            <p>
+              You don't have any friends yet.
+              Send a friend request using a Friend ID
+              to start building your circle.
+            </p>
+
+
+            <button
+              class="primary-btn"
+              data-go-page="addFriendPage"
+            >
+              Add Your First Friend
+            </button>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+
+      <!-- =================================================
+           FRIEND REQUESTS
+      ================================================== -->
+
+      <section
+        id="requestsPage"
+        class="page"
+      >
+
+        <div class="page-heading-row">
+
+          <div>
+
+            <span class="eyebrow">
+              CONNECTIONS
+            </span>
+
+            <h2>
+              Friend Requests
+            </h2>
+
+            <p>
+              Manage people who want to connect with you.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div class="request-tabs">
+
+          <button
+            class="request-tab active"
+            data-request-tab="received"
+          >
+
+            Received
+
+            <span id="receivedCount">
+              0
+            </span>
+
+          </button>
+
+
+          <button
+            class="request-tab"
+            data-request-tab="sent"
+          >
+
+            Sent
+
+            <span id="sentCount">
+              0
+            </span>
+
+          </button>
+
+        </div>
+
+
+        <div
+          id="receivedRequestsContainer"
+          class="requests-container request-tab-content active"
+        >
+
+          <div class="empty-state">
+
+            <div class="empty-icon">
+              ✉
+            </div>
+
+            <h3>
+              No pending requests
+            </h3>
+
+            <p>
+              When someone sends you a friend request,
+              it will appear here.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div
+          id="sentRequestsContainer"
+          class="requests-container request-tab-content"
+        >
+
+          <div class="empty-state">
+
+            <div class="empty-icon">
+              📤
+            </div>
+
+            <h3>
+              No sent requests
+            </h3>
+
+            <p>
+              Friend requests you send will appear here.
+            </p>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+
+      <!-- =================================================
+           BEST FRIENDS
+      ================================================== -->
+
+      <section
+        id="bestFriendsPage"
+        class="page"
+      >
+
+        <div class="page-heading-row">
+
+          <div>
+
+            <span class="eyebrow">
+              YOUR INNER CIRCLE
+            </span>
+
+            <h2>
+              Best Friends
+            </h2>
+
+            <p>
+              Choose special friends from your normal friend list.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div class="best-friends-banner">
+
+          <div class="best-banner-icon">
+            ★
+          </div>
+
+          <div>
+
+            <h3>
+              Your closest people
+            </h3>
+
+            <p>
+              Best Friends are optional.
+              A person must already be your friend before
+              they can be added here.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div
+          id="bestFriendsContainer"
+          class="friends-grid"
+        >
+
+          <div class="empty-state">
+
+            <div class="empty-icon">
+              ★
+            </div>
+
+            <h3>
+              No Best Friends yet
+            </h3>
+
+            <p>
+              Add someone from your Friends list to create
+              your special Best Friends circle.
+            </p>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+
+      <!-- =================================================
+           ADD FRIEND
+      ================================================== -->
+
+      <section
+        id="addFriendPage"
+        class="page"
+      >
+
+        <div class="page-heading-row">
+
+          <div>
+
+            <span class="eyebrow">
+              GROW YOUR CIRCLE
+            </span>
+
+            <h2>
+              Add a Friend
+            </h2>
+
+            <p>
+              Search for someone using their unique Friend ID.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div class="add-friend-card">
+
+          <div class="add-friend-icon">
+            👥
+          </div>
+
+
+          <h3>
+            Enter Friend ID
+          </h3>
+
+
+          <p>
+            Ask your friend for their Friend ID
+            and enter it below.
+          </p>
+
+
+          <form id="addFriendForm">
+
+            <div class="friend-id-input">
+
+              <span>
+                🆔
+              </span>
+
+              <input
+                type="text"
+                id="friendIdInput"
+                placeholder="Example: FZ-123456"
+                maxlength="9"
+                autocomplete="off"
+                required
+              />
+
+            </div>
+
+
+            <button
+              type="submit"
+              class="primary-btn full-width"
+            >
+              Search Friend
+            </button>
+
+          </form>
+
+
+          <div
+            id="friendSearchResult"
+            class="friend-search-result hidden"
+          ></div>
+
+        </div>
+
+
+        <div class="friend-id-info">
+
+          <div class="info-icon">
+            💡
+          </div>
+
+
+          <div>
+
+            <h4>
+              What is a Friend ID?
+            </h4>
+
+            <p>
+              Every FriendZone account has a unique Friend ID.
+              Share it with your friends so they can find you
+              without needing your email address.
+            </p>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+
+      <!-- =================================================
+           PROFILE
+      ================================================== -->
+
+      <section
+        id="profilePage"
+        class="page"
+      >
+
+        <div class="page-heading-row">
+
+          <div>
+
+            <span class="eyebrow">
+              YOUR ACCOUNT
+            </span>
+
+            <h2>
+              Profile
+            </h2>
+
+            <p>
+              Manage your FriendZone profile.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <!-- PROFILE CARD -->
+
+        <div class="profile-card">
+
+          <div class="profile-cover">
+
+            <div class="profile-cover-glow"></div>
+
+          </div>
+
+
+          <div class="profile-main">
+
+            <div class="profile-avatar-wrapper">
+
+              <div
+                id="profileAvatar"
+                class="profile-avatar"
+              >
+                U
+              </div>
+
+            </div>
+
+
+            <div class="profile-info">
+
+              <h2 id="profileName">
+                User
+              </h2>
+
+              <p id="profileUsername">
+                @username
+              </p>
+
+
+              <div class="friend-id-display">
+
+                <span>
+                  Friend ID
+                </span>
+
+                <strong id="profileFriendId">
+                  FZ-000000
+                </strong>
+
+
+                <button
+                  id="copyFriendIdBtn"
+                  class="copy-btn"
+                  title="Copy Friend ID"
+                >
+                  ⧉
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- PROFILE SETTINGS -->
+
+        <div class="settings-card">
+
+          <div class="section-header">
+
+            <div>
+
+              <h3>
+                Profile Information
+              </h3>
+
+              <p>
+                Update your public profile details.
+              </p>
+
+            </div>
+
+          </div>
+
+
+          <form id="profileForm">
+
+            <div class="form-grid">
+
+
+              <div class="input-group">
+
+                <label for="profileNameInput">
+                  Full Name
+                </label>
+
+                <input
+                  type="text"
+                  id="profileNameInput"
+                  maxlength="60"
+                  required
+                />
+
+              </div>
+
+
+              <div class="input-group">
+
+                <label for="profileUsernameInput">
+                  Username
+                </label>
+
+                <input
+                  type="text"
+                  id="profileUsernameInput"
+                  maxlength="30"
+                  required
+                />
+
+              </div>
+
+            </div>
+
+
+            <button
+              type="submit"
+              class="primary-btn"
+            >
+              Save Changes
+            </button>
+
+          </form>
+
+        </div>
+
+      </section>
 
     </main>
 
-</div>
+  </div>
 
 
-<script src="script.js"></script>
+
+  <!-- =====================================================
+       FRIEND PROFILE MODAL
+  ====================================================== -->
+
+  <div
+    id="friendModal"
+    class="modal hidden"
+  >
+
+    <div
+      class="modal-overlay"
+      data-close-modal
+    ></div>
+
+
+    <div class="modal-card">
+
+      <button
+        class="modal-close"
+        data-close-modal
+        aria-label="Close"
+      >
+        ×
+      </button>
+
+
+      <div id="modalFriendContent"></div>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- =====================================================
+       CONFIRMATION MODAL
+  ====================================================== -->
+
+  <div
+    id="confirmModal"
+    class="modal hidden"
+  >
+
+    <div class="modal-overlay"></div>
+
+
+    <div class="modal-card small-modal">
+
+      <div class="modal-icon">
+        ⚠
+      </div>
+
+
+      <h3 id="confirmTitle">
+        Are you sure?
+      </h3>
+
+
+      <p id="confirmMessage">
+        Please confirm this action.
+      </p>
+
+
+      <div class="modal-actions">
+
+        <button
+          id="confirmCancelBtn"
+          class="secondary-btn"
+        >
+          Cancel
+        </button>
+
+
+        <button
+          id="confirmActionBtn"
+          class="danger-btn"
+        >
+          Confirm
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- =====================================================
+       TOAST NOTIFICATIONS
+  ====================================================== -->
+
+  <div
+    id="toastContainer"
+    class="toast-container"
+  ></div>
+
+
+
+  <!-- =====================================================
+       SUPABASE CONFIG
+  ====================================================== -->
+
+  <script>
+
+    /*
+     * FriendZone Supabase Configuration
+     *
+     * This is the PUBLIC client configuration.
+     *
+     * IMPORTANT:
+     * Never put a Supabase service_role/secret key here.
+     */
+
+    const SUPABASE_URL =
+      "https://hjdevuoxuoyenzmawwnb.supabase.co";
+
+    const SUPABASE_ANON_KEY =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzIiwicmVmIjoiaGpkZXZ1b3h1b3llbnptYXd3bmIiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc4ODc4ODM2NiwiZXhwIjoyMTA0MzY0MzY2fQ.-ER4x0hqUYss521B_FWAHnfWjtxg9YJIaWNXjQJPPhI";
+
+    /*
+     * Make configuration available to script.js.
+     */
+
+    window.FRIENDZONE_CONFIG = {
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    };
+
+  </script>
+
+
+
+  <!-- =====================================================
+       FRIENDZONE JAVASCRIPT
+  ====================================================== -->
+
+  <script src="script.js"></script>
 
 </body>
 </html>
