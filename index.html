@@ -2,524 +2,257 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-
   <meta
     name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
   />
-
-  <meta
-    name="description"
-    content="FriendZone — Connect, build friendships and create your own circle."
-  />
-
-  <meta name="theme-color" content="#0b0b12" />
-
+  <meta name="theme-color" content="#0b0814" />
   <title>FriendZone</title>
 
-  <!-- =========================
-       FONTS
-  ========================== -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet"
-  />
-
-  <!-- =========================
-       SUPABASE
-  ========================== -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- =========================
-       WEBSITE CSS
-  ========================== -->
   <link rel="stylesheet" href="style.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
 
+  <!-- ================= AUTH ================= -->
+  <section id="authScreen" class="auth-screen">
 
-
-  <!-- =====================================================
-       AUTHENTICATION
-  ====================================================== -->
-
-  <section id="authScreen" class="auth-screen hidden">
-
-    <div class="auth-bg">
-
-      <div class="bg-orb orb-1"></div>
-      <div class="bg-orb orb-2"></div>
-      <div class="bg-orb orb-3"></div>
-
-    </div>
-
-
-    <div class="auth-container">
-
-      <!-- BRAND -->
+    <div class="auth-card">
 
       <div class="auth-brand">
-
-        <div class="brand-logo">
-          FZ
-        </div>
+        <div class="brand-logo">F</div>
 
         <div>
           <h1>FriendZone</h1>
-          <p>Connect. Share. Belong.</p>
+          <p>Your circle. Your people.</p>
+        </div>
+      </div>
+
+      <!-- LOGIN -->
+      <div id="loginPanel" class="auth-panel">
+
+        <div class="auth-heading">
+          <h2>Welcome back 👋</h2>
+          <p>Login to continue to your circle.</p>
+        </div>
+
+        <form id="loginForm">
+
+          <div class="input-group">
+            <label for="loginEmail">Email</label>
+            <input
+              id="loginEmail"
+              type="email"
+              placeholder="Enter your email"
+              autocomplete="email"
+              required
+            />
+          </div>
+
+          <div class="input-group">
+            <label for="loginPassword">Password</label>
+
+            <div class="password-field">
+              <input
+                id="loginPassword"
+                type="password"
+                placeholder="Enter your password"
+                autocomplete="current-password"
+                required
+              />
+
+              <button
+                type="button"
+                class="password-toggle"
+                data-target="loginPassword"
+              >
+                Show
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="primary-btn">
+            Login
+          </button>
+
+        </form>
+
+        <div class="auth-switch">
+          <span>Don't have an account?</span>
+          <button id="showSignupBtn" type="button">
+            Create account
+          </button>
         </div>
 
       </div>
 
+      <!-- SIGNUP -->
+      <div id="signupPanel" class="auth-panel hidden">
 
-      <!-- AUTH CARD -->
-
-      <div class="auth-card">
-
-
-        <!-- =========================
-             LOGIN
-        ========================== -->
-
-        <div id="loginPanel" class="auth-panel">
-
-          <div class="auth-heading">
-
-            <span class="eyebrow">
-              WELCOME BACK
-            </span>
-
-            <h2>
-              Good to see you again 👋
-            </h2>
-
-            <p>
-              Login to continue to your FriendZone.
-            </p>
-
-          </div>
-
-
-          <form id="loginForm">
-
-            <div class="input-group">
-
-              <label for="loginEmail">
-                Email
-              </label>
-
-              <input
-                type="email"
-                id="loginEmail"
-                placeholder="Enter your email"
-                autocomplete="email"
-                required
-              />
-
-            </div>
-
-
-            <div class="input-group">
-
-              <label for="loginPassword">
-                Password
-              </label>
-
-              <div class="password-field">
-
-                <input
-                  type="password"
-                  id="loginPassword"
-                  placeholder="Enter your password"
-                  autocomplete="current-password"
-                  required
-                />
-
-                <button
-                  type="button"
-                  class="password-toggle"
-                  data-target="loginPassword"
-                >
-                  👁
-                </button>
-
-              </div>
-
-            </div>
-
-
-            <button
-              type="submit"
-              class="primary-btn full-width"
-            >
-              <span>Login</span>
-            </button>
-
-          </form>
-
-
-          <div class="auth-divider">
-            <span>OR</span>
-          </div>
-
-
-          <button
-            id="showSignupBtn"
-            class="secondary-btn full-width"
-          >
-            Create New Account
-          </button>
-
+        <div class="auth-heading">
+          <h2>Create your account ✨</h2>
+          <p>Start building your FriendZone.</p>
         </div>
 
+        <form id="signupForm">
 
-        <!-- =========================
-             SIGN UP
-        ========================== -->
-
-        <div id="signupPanel" class="auth-panel hidden">
-
-          <div class="auth-heading">
-
-            <span class="eyebrow">
-              JOIN FRIENDZONE
-            </span>
-
-            <h2>
-              Create your account ✨
-            </h2>
-
-            <p>
-              Start building your own circle.
-            </p>
-
+          <div class="input-group">
+            <label for="signupName">Name</label>
+            <input
+              id="signupName"
+              type="text"
+              placeholder="Your name"
+              autocomplete="name"
+              required
+            />
           </div>
 
+          <div class="input-group">
+            <label for="signupUsername">Username</label>
+            <input
+              id="signupUsername"
+              type="text"
+              placeholder="Choose a username"
+              autocomplete="username"
+              required
+            />
+          </div>
 
-          <form id="signupForm">
+          <div class="input-group">
+            <label for="signupEmail">Email</label>
+            <input
+              id="signupEmail"
+              type="email"
+              placeholder="Enter your email"
+              autocomplete="email"
+              required
+            />
+          </div>
 
-            <div class="input-group">
+          <div class="input-group">
+            <label for="signupPassword">Password</label>
 
-              <label for="signupName">
-                Full Name
-              </label>
-
+            <div class="password-field">
               <input
-                type="text"
-                id="signupName"
-                placeholder="Enter your full name"
-                maxlength="60"
+                id="signupPassword"
+                type="password"
+                placeholder="Create a password"
+                autocomplete="new-password"
                 required
               />
 
+              <button
+                type="button"
+                class="password-toggle"
+                data-target="signupPassword"
+              >
+                Show
+              </button>
             </div>
+          </div>
 
-
-            <div class="input-group">
-
-              <label for="signupUsername">
-                Username
-              </label>
-
-              <input
-                type="text"
-                id="signupUsername"
-                placeholder="Choose a username"
-                maxlength="30"
-                required
-              />
-
-            </div>
-
-
-            <div class="input-group">
-
-              <label for="signupEmail">
-                Email
-              </label>
-
-              <input
-                type="email"
-                id="signupEmail"
-                placeholder="Enter your email"
-                autocomplete="email"
-                required
-              />
-
-            </div>
-
-
-            <div class="input-group">
-
-              <label for="signupPassword">
-                Password
-              </label>
-
-              <div class="password-field">
-
-                <input
-                  type="password"
-                  id="signupPassword"
-                  placeholder="Create a password"
-                  minlength="6"
-                  autocomplete="new-password"
-                  required
-                />
-
-                <button
-                  type="button"
-                  class="password-toggle"
-                  data-target="signupPassword"
-                >
-                  👁
-                </button>
-
-              </div>
-
-            </div>
-
-
-            <button
-              type="submit"
-              class="primary-btn full-width"
-            >
-              Create Account
-            </button>
-
-          </form>
-
-
-          <button
-            id="showLoginBtn"
-            class="text-btn"
-          >
-            ← Already have an account? Login
+          <button type="submit" class="primary-btn">
+            Create Account
           </button>
 
+        </form>
+
+        <div class="auth-switch">
+          <span>Already have an account?</span>
+          <button id="showLoginBtn" type="button">
+            Login
+          </button>
         </div>
 
       </div>
-
-
-      <p class="auth-footer">
-        Your friends. Your circle. Your FriendZone.
-      </p>
 
     </div>
-
   </section>
 
 
+  <!-- ================= MAIN APP ================= -->
+  <section id="mainApp" class="main-app hidden">
 
-  <!-- =====================================================
-       MAIN APPLICATION
-  ====================================================== -->
+    <!-- SIDEBAR OVERLAY -->
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
-  <div id="mainApp" class="main-app hidden">
-
-
-    <!-- =================================================
-         SIDEBAR
-    ================================================== -->
-
+    <!-- SIDEBAR -->
     <aside id="sidebar" class="sidebar">
 
+      <div class="sidebar-top">
 
-      <!-- SIDEBAR HEADER -->
+        <div class="sidebar-brand">
+          <div class="brand-logo small">F</div>
 
-      <div class="sidebar-header">
-
-        <div class="brand">
-
-          <div class="brand-logo">
-            FZ
+          <div>
+            <strong>FriendZone</strong>
+            <span>Your circle</span>
           </div>
-
-          <div class="brand-text">
-
-            <h1>FriendZone</h1>
-
-            <span>
-              Your people. Your zone.
-            </span>
-
-          </div>
-
         </div>
 
-
-        <button
-          id="closeSidebarBtn"
-          class="mobile-close-btn"
-          aria-label="Close menu"
-        >
+        <button id="closeSidebarBtn" class="icon-btn" type="button">
           ×
         </button>
 
       </div>
 
+      <div class="sidebar-user">
 
-      <!-- NAVIGATION -->
+        <div class="avatar-wrapper">
+          <img id="sidebarAvatar" alt="Profile" />
+          <span class="online-dot"></span>
+        </div>
 
-      <nav class="main-navigation">
+        <div class="sidebar-user-info">
+          <strong id="sidebarUserName">User</strong>
+          <span id="sidebarFriendId">FZ-000000</span>
+        </div>
 
+      </div>
 
-        <button
-          class="nav-item active"
-          data-page="homePage"
-        >
+      <nav class="sidebar-nav">
 
-          <span class="nav-icon">
-            ⌂
-          </span>
-
-          <span class="nav-label">
-            Home
-          </span>
-
+        <button class="nav-item active" data-page="home">
+          <span>⌂</span>
+          <span>Home</span>
         </button>
 
-
-        <button
-          class="nav-item"
-          data-page="friendsPage"
-        >
-
-          <span class="nav-icon">
-            👥
-          </span>
-
-          <span class="nav-label">
-            Friends
-          </span>
-
-          <span
-            id="friendsBadge"
-            class="nav-badge hidden"
-          >
-            0
-          </span>
-
+        <button class="nav-item" data-page="friends">
+          <span>👥</span>
+          <span>Friends</span>
+          <b id="friendsBadge" class="nav-badge hidden">0</b>
         </button>
 
-
-        <button
-          class="nav-item"
-          data-page="requestsPage"
-        >
-
-          <span class="nav-icon">
-            ✉
-          </span>
-
-          <span class="nav-label">
-            Requests
-          </span>
-
-          <span
-            id="requestsBadge"
-            class="nav-badge hidden"
-          >
-            0
-          </span>
-
+        <button class="nav-item" data-page="requests">
+          <span>↔</span>
+          <span>Requests</span>
+          <b id="requestsBadge" class="nav-badge hidden">0</b>
         </button>
 
-
-        <button
-          class="nav-item"
-          data-page="bestFriendsPage"
-        >
-
-          <span class="nav-icon">
-            ★
-          </span>
-
-          <span class="nav-label">
-            Best Friends
-          </span>
-
+        <button class="nav-item" data-page="best-friends">
+          <span>♥</span>
+          <span>Best Friends</span>
         </button>
 
-
-        <button
-          class="nav-item"
-          data-page="addFriendPage"
-        >
-
-          <span class="nav-icon">
-            ＋
-          </span>
-
-          <span class="nav-label">
-            Add Friend
-          </span>
-
+        <button class="nav-item" data-page="add-friend">
+          <span>＋</span>
+          <span>Add Friend</span>
         </button>
 
-
-        <button
-          class="nav-item"
-          data-page="profilePage"
-        >
-
-          <span class="nav-icon">
-            ◯
-          </span>
-
-          <span class="nav-label">
-            Profile
-          </span>
-
+        <button class="nav-item" data-page="profile">
+          <span>◉</span>
+          <span>Profile</span>
         </button>
 
       </nav>
 
-
-      <!-- SIDEBAR USER -->
-
       <div class="sidebar-bottom">
 
-        <div class="sidebar-user">
-
-          <div
-            id="sidebarAvatar"
-            class="avatar"
-          >
-            U
-          </div>
-
-
-          <div class="sidebar-user-info">
-
-            <strong id="sidebarUserName">
-              User
-            </strong>
-
-            <span id="sidebarFriendId">
-              FZ-000000
-            </span>
-
-          </div>
-
-        </div>
-
-
-        <button
-          id="logoutBtn"
-          class="logout-btn"
-        >
-
-          <span>
-            ↪
-          </span>
-
-          Logout
-
+        <button id="logoutBtn" class="logout-btn" type="button">
+          <span>↪</span>
+          <span>Logout</span>
         </button>
 
       </div>
@@ -527,76 +260,43 @@
     </aside>
 
 
-    <!-- MOBILE SIDEBAR OVERLAY -->
-
-    <div
-      id="sidebarOverlay"
-      class="sidebar-overlay"
-    ></div>
-
-
-
-    <!-- =================================================
-         CONTENT
-    ================================================== -->
-
+    <!-- CONTENT -->
     <main class="content-area">
 
-
-      <!-- TOP HEADER -->
-
+      <!-- HEADER -->
       <header class="top-header">
 
-
-        <button
-          id="openSidebarBtn"
-          class="menu-btn"
-          aria-label="Open menu"
-        >
+        <button id="openSidebarBtn" class="icon-btn menu-btn" type="button">
           ☰
         </button>
 
-
-        <div class="page-title">
-
-          <h2 id="currentPageTitle">
-            Home
-          </h2>
-
+        <div class="page-heading">
+          <h1 id="currentPageTitle">Home</h1>
           <p id="currentPageSubtitle">
             Welcome back to your FriendZone.
           </p>
-
         </div>
 
-
         <div class="header-actions">
-
 
           <button
             id="headerRequestBtn"
             class="header-icon-btn"
-            title="Friend Requests"
+            type="button"
+            title="Friend requests"
           >
-
-            ✉
-
-            <span
-              id="headerRequestBadge"
-              class="header-badge hidden"
-            >
+            ♡
+            <span id="headerRequestBadge" class="header-badge hidden">
               0
             </span>
-
           </button>
-
 
           <button
             id="headerProfileBtn"
-            class="header-avatar"
-            title="Profile"
+            class="header-avatar-btn"
+            type="button"
           >
-            U
+            <img id="headerAvatar" alt="Profile" />
           </button>
 
         </div>
@@ -604,434 +304,148 @@
       </header>
 
 
-
-      <!-- =================================================
-           HOME
-      ================================================== -->
-
-      <section
-        id="homePage"
-        class="page active-page"
-      >
-
-
-        <!-- HERO -->
+      <!-- ================= HOME ================= -->
+      <section id="homePage" class="page active-page">
 
         <div class="hero-card">
 
           <div class="hero-content">
+            <span class="eyebrow">WELCOME TO YOUR CIRCLE</span>
 
-            <span class="eyebrow">
-              WELCOME TO FRIENDZONE
-            </span>
-
-
-            <h1>
-              Your friends.
-              <br>
-              <span>Your world.</span>
-            </h1>
-
+            <h2>
+              Connect with your
+              <span>people.</span>
+            </h2>
 
             <p>
-              Build your own circle, connect with people using
-              Friend IDs and keep your closest friends in one place.
+              Add friends manually, build your circle and choose your
+              closest friends as Best Friends.
             </p>
 
-
-            <div class="hero-actions">
-
-              <button
-                class="primary-btn"
-                data-go-page="addFriendPage"
-              >
-                ＋ Add Friend
-              </button>
-
-
-              <button
-                class="secondary-btn"
-                data-go-page="friendsPage"
-              >
-                View Friends
-              </button>
-
-            </div>
-
+            <button class="primary-btn hero-btn" data-go-page="add-friend">
+              Add Your First Friend
+            </button>
           </div>
 
-
           <div class="hero-decoration">
-
-            <div class="hero-orbit orbit-one"></div>
-            <div class="hero-orbit orbit-two"></div>
-
-
-            <div class="hero-center-logo">
-              FZ
-            </div>
-
-
-            <div class="floating-avatar avatar-a">
-              A
-            </div>
-
-            <div class="floating-avatar avatar-b">
-              S
-            </div>
-
-            <div class="floating-avatar avatar-c">
-              R
-            </div>
-
-            <div class="floating-avatar avatar-d">
-              M
-            </div>
-
+            <div class="hero-orb orb-one"></div>
+            <div class="hero-orb orb-two"></div>
+            <div class="hero-ring"></div>
           </div>
 
         </div>
 
-
-
-        <!-- STATISTICS -->
 
         <div class="stats-grid">
 
-
           <div class="stat-card">
-
-            <div class="stat-icon">
-              👥
-            </div>
-
-            <div>
-
-              <span>
-                Total Friends
-              </span>
-
-              <strong id="homeFriendsCount">
-                0
-              </strong>
-
-            </div>
-
+            <div class="stat-icon">👥</div>
+            <span>Friends</span>
+            <strong id="homeFriendsCount">0</strong>
           </div>
 
-
           <div class="stat-card">
-
-            <div class="stat-icon">
-              ✉
-            </div>
-
-            <div>
-
-              <span>
-                Requests
-              </span>
-
-              <strong id="homeRequestsCount">
-                0
-              </strong>
-
-            </div>
-
+            <div class="stat-icon">↔</div>
+            <span>Requests</span>
+            <strong id="homeRequestsCount">0</strong>
           </div>
 
-
           <div class="stat-card">
-
-            <div class="stat-icon">
-              ★
-            </div>
-
-            <div>
-
-              <span>
-                Best Friends
-              </span>
-
-              <strong id="homeBestFriendsCount">
-                0
-              </strong>
-
-            </div>
-
+            <div class="stat-icon">♥</div>
+            <span>Best Friends</span>
+            <strong id="homeBestFriendsCount">0</strong>
           </div>
 
-
           <div class="stat-card">
-
-            <div class="stat-icon">
-              🆔
-            </div>
-
-            <div>
-
-              <span>
-                Friend ID
-              </span>
-
-              <strong id="homeFriendId">
-                FZ-000000
-              </strong>
-
-            </div>
-
+            <div class="stat-icon">ID</div>
+            <span>Your Friend ID</span>
+            <strong id="homeFriendId">—</strong>
           </div>
 
         </div>
 
 
-
-        <!-- QUICK ACTIONS -->
-
-        <div class="section-header">
-
+        <div class="section-heading">
           <div>
-
-            <h3>
-              Quick Actions
-            </h3>
-
-            <p>
-              Manage your FriendZone easily.
-            </p>
-
+            <h2>Recent Friends</h2>
+            <p>Your latest connections.</p>
           </div>
 
+          <button class="text-btn" data-go-page="friends">
+            View all
+          </button>
+        </div>
+
+        <div id="recentFriendsContainer" class="cards-grid">
+          <div class="empty-state">
+            <div class="empty-icon">👥</div>
+            <h3>No friends yet</h3>
+            <p>Add someone using their Friend ID.</p>
+          </div>
         </div>
 
 
-        <div class="quick-actions-grid">
+        <div class="quick-actions">
 
-
-          <button
-            class="quick-action-card"
-            data-go-page="addFriendPage"
-          >
-
-            <div class="quick-icon">
-              ＋
-            </div>
-
+          <button class="quick-action" data-go-page="add-friend">
+            <span>＋</span>
             <div>
-
-              <strong>
-                Add a Friend
-              </strong>
-
-              <span>
-                Use their Friend ID
-              </span>
-
+              <strong>Add Friend</strong>
+              <small>Use a Friend ID</small>
             </div>
-
-            <span class="arrow">
-              →
-            </span>
-
           </button>
 
-
-          <button
-            class="quick-action-card"
-            data-go-page="requestsPage"
-          >
-
-            <div class="quick-icon">
-              ✉
-            </div>
-
+          <button class="quick-action" data-go-page="requests">
+            <span>↔</span>
             <div>
-
-              <strong>
-                Friend Requests
-              </strong>
-
-              <span>
-                Accept or reject requests
-              </span>
-
+              <strong>Requests</strong>
+              <small>Manage friend requests</small>
             </div>
-
-            <span class="arrow">
-              →
-            </span>
-
           </button>
 
-
-          <button
-            class="quick-action-card"
-            data-go-page="bestFriendsPage"
-          >
-
-            <div class="quick-icon">
-              ★
-            </div>
-
+          <button class="quick-action" data-go-page="best-friends">
+            <span>♥</span>
             <div>
-
-              <strong>
-                Best Friends
-              </strong>
-
-              <span>
-                Manage your closest people
-              </span>
-
+              <strong>Best Friends</strong>
+              <small>Your closest people</small>
             </div>
-
-            <span class="arrow">
-              →
-            </span>
-
           </button>
-
-        </div>
-
-
-
-        <!-- RECENT FRIENDS -->
-
-        <div class="section-header friends-section-header">
-
-          <div>
-
-            <h3>
-              Recent Friends
-            </h3>
-
-            <p>
-              Your newest connections.
-            </p>
-
-          </div>
-
-
-          <button
-            class="text-btn"
-            data-go-page="friendsPage"
-          >
-            View all →
-          </button>
-
-        </div>
-
-
-        <div
-          id="recentFriendsContainer"
-          class="friends-preview-grid"
-        >
-
-          <div class="empty-state compact">
-
-            <div class="empty-icon">
-              👥
-            </div>
-
-            <h4>
-              No friends yet
-            </h4>
-
-            <p>
-              Add your first friend using their Friend ID.
-            </p>
-
-          </div>
 
         </div>
 
       </section>
 
 
+      <!-- ================= FRIENDS ================= -->
+      <section id="friendsPage" class="page">
 
-      <!-- =================================================
-           FRIENDS
-      ================================================== -->
-
-      <section
-        id="friendsPage"
-        class="page"
-      >
-
-        <div class="page-heading-row">
-
+        <div class="page-intro">
           <div>
-
-            <span class="eyebrow">
-              YOUR CIRCLE
-            </span>
-
-            <h2>
-              Friends
-            </h2>
-
-            <p>
-              Your accepted friendships appear here.
-            </p>
-
+            <span class="eyebrow">YOUR CIRCLE</span>
+            <h2>Friends</h2>
+            <p>Everyone you've connected with.</p>
           </div>
 
-
-          <button
-            class="primary-btn"
-            data-go-page="addFriendPage"
-          >
+          <button class="primary-btn small-btn" data-go-page="add-friend">
             ＋ Add Friend
           </button>
-
         </div>
 
-
-        <div class="search-bar-wrapper">
-
-          <span class="search-icon">
-            ⌕
-          </span>
-
+        <div class="search-box">
+          <span>⌕</span>
           <input
-            type="search"
             id="friendsSearch"
+            type="search"
             placeholder="Search your friends..."
-            autocomplete="off"
           />
-
         </div>
 
-
-        <div
-          id="friendsContainer"
-          class="friends-grid"
-        >
+        <div id="friendsContainer" class="cards-grid">
 
           <div class="empty-state">
-
-            <div class="empty-icon">
-              👥
-            </div>
-
-            <h3>
-              Your friend list is empty
-            </h3>
-
-            <p>
-              You don't have any friends yet.
-              Send a friend request using a Friend ID
-              to start building your circle.
-            </p>
-
-
-            <button
-              class="primary-btn"
-              data-go-page="addFriendPage"
-            >
-              Add Your First Friend
-            </button>
-
+            <div class="empty-icon">👥</div>
+            <h3>No friends yet</h3>
+            <p>Your friend list is empty.</p>
           </div>
 
         </div>
@@ -1039,306 +453,119 @@
       </section>
 
 
+      <!-- ================= REQUESTS ================= -->
+      <section id="requestsPage" class="page">
 
-      <!-- =================================================
-           FRIEND REQUESTS
-      ================================================== -->
-
-      <section
-        id="requestsPage"
-        class="page"
-      >
-
-        <div class="page-heading-row">
-
+        <div class="page-intro">
           <div>
-
-            <span class="eyebrow">
-              CONNECTIONS
-            </span>
-
-            <h2>
-              Friend Requests
-            </h2>
-
-            <p>
-              Manage people who want to connect with you.
-            </p>
-
+            <span class="eyebrow">CONNECTIONS</span>
+            <h2>Friend Requests</h2>
+            <p>Manage incoming and outgoing requests.</p>
           </div>
-
         </div>
-
 
         <div class="request-tabs">
 
           <button
             class="request-tab active"
             data-request-tab="received"
+            type="button"
           >
-
             Received
-
-            <span id="receivedCount">
-              0
-            </span>
-
+            <span id="receivedCount">0</span>
           </button>
-
 
           <button
             class="request-tab"
             data-request-tab="sent"
+            type="button"
           >
-
             Sent
-
-            <span id="sentCount">
-              0
-            </span>
-
+            <span id="sentCount">0</span>
           </button>
 
         </div>
 
+        <div id="receivedRequestsContainer" class="request-list"></div>
 
-        <div
-          id="receivedRequestsContainer"
-          class="requests-container request-tab-content active"
-        >
-
-          <div class="empty-state">
-
-            <div class="empty-icon">
-              ✉
-            </div>
-
-            <h3>
-              No pending requests
-            </h3>
-
-            <p>
-              When someone sends you a friend request,
-              it will appear here.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div
-          id="sentRequestsContainer"
-          class="requests-container request-tab-content"
-        >
-
-          <div class="empty-state">
-
-            <div class="empty-icon">
-              📤
-            </div>
-
-            <h3>
-              No sent requests
-            </h3>
-
-            <p>
-              Friend requests you send will appear here.
-            </p>
-
-          </div>
-
-        </div>
+        <div id="sentRequestsContainer" class="request-list hidden"></div>
 
       </section>
 
 
+      <!-- ================= BEST FRIENDS ================= -->
+      <section id="bestFriendsPage" class="page">
 
-      <!-- =================================================
-           BEST FRIENDS
-      ================================================== -->
-
-      <section
-        id="bestFriendsPage"
-        class="page"
-      >
-
-        <div class="page-heading-row">
-
+        <div class="page-intro">
           <div>
-
-            <span class="eyebrow">
-              YOUR INNER CIRCLE
-            </span>
-
-            <h2>
-              Best Friends
-            </h2>
-
-            <p>
-              Choose special friends from your normal friend list.
-            </p>
-
+            <span class="eyebrow">YOUR INNER CIRCLE</span>
+            <h2>Best Friends</h2>
+            <p>Choose the friends who mean the most to you.</p>
           </div>
-
         </div>
 
-
-        <div class="best-friends-banner">
-
-          <div class="best-banner-icon">
-            ★
-          </div>
-
-          <div>
-
-            <h3>
-              Your closest people
-            </h3>
-
-            <p>
-              Best Friends are optional.
-              A person must already be your friend before
-              they can be added here.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div
-          id="bestFriendsContainer"
-          class="friends-grid"
-        >
-
-          <div class="empty-state">
-
-            <div class="empty-icon">
-              ★
-            </div>
-
-            <h3>
-              No Best Friends yet
-            </h3>
-
-            <p>
-              Add someone from your Friends list to create
-              your special Best Friends circle.
-            </p>
-
-          </div>
-
-        </div>
-
-      </section>
-
-
-
-      <!-- =================================================
-           ADD FRIEND
-      ================================================== -->
-
-      <section
-        id="addFriendPage"
-        class="page"
-      >
-
-        <div class="page-heading-row">
-
-          <div>
-
-            <span class="eyebrow">
-              GROW YOUR CIRCLE
-            </span>
-
-            <h2>
-              Add a Friend
-            </h2>
-
-            <p>
-              Search for someone using their unique Friend ID.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div class="add-friend-card">
-
-          <div class="add-friend-icon">
-            👥
-          </div>
-
-
-          <h3>
-            Enter Friend ID
-          </h3>
-
-
+        <div class="info-banner">
+          <span>♥</span>
           <p>
-            Ask your friend for their Friend ID
-            and enter it below.
+            Best Friends are optional. Adding someone here does not
+            automatically make them your normal friend.
           </p>
+        </div>
 
+        <div id="bestFriendsContainer" class="cards-grid">
 
-          <form id="addFriendForm">
-
-            <div class="friend-id-input">
-
-              <span>
-                🆔
-              </span>
-
-              <input
-                type="text"
-                id="friendIdInput"
-                placeholder="Example: FZ-123456"
-                maxlength="9"
-                autocomplete="off"
-                required
-              />
-
-            </div>
-
-
-            <button
-              type="submit"
-              class="primary-btn full-width"
-            >
-              Search Friend
-            </button>
-
-          </form>
-
-
-          <div
-            id="friendSearchResult"
-            class="friend-search-result hidden"
-          ></div>
+          <div class="empty-state">
+            <div class="empty-icon">♥</div>
+            <h3>No Best Friends yet</h3>
+            <p>Add your closest friends from your Friends list.</p>
+          </div>
 
         </div>
 
-
-        <div class="friend-id-info">
-
-          <div class="info-icon">
-            💡
-          </div>
+      </section>
 
 
-          <div>
+      <!-- ================= ADD FRIEND ================= -->
+      <section id="addFriendPage" class="page">
 
-            <h4>
-              What is a Friend ID?
-            </h4>
+        <div class="add-friend-wrapper">
+
+          <div class="add-friend-card">
+
+            <div class="add-friend-icon">＋</div>
+
+            <span class="eyebrow">GROW YOUR CIRCLE</span>
+
+            <h2>Add a Friend</h2>
 
             <p>
-              Every FriendZone account has a unique Friend ID.
-              Share it with your friends so they can find you
-              without needing your email address.
+              Enter someone's unique Friend ID to find them and
+              send a friend request.
             </p>
+
+            <form id="addFriendForm">
+
+              <div class="friend-id-input">
+
+                <span>FZ</span>
+
+                <input
+                  id="friendIdInput"
+                  type="text"
+                  placeholder="Enter Friend ID"
+                  autocomplete="off"
+                  required
+                />
+
+              </div>
+
+              <button type="submit" class="primary-btn">
+                Find Friend
+              </button>
+
+            </form>
+
+            <div id="friendSearchResult"></div>
 
           </div>
 
@@ -1347,170 +574,70 @@
       </section>
 
 
+      <!-- ================= PROFILE ================= -->
+      <section id="profilePage" class="page">
 
-      <!-- =================================================
-           PROFILE
-      ================================================== -->
+        <div class="profile-layout">
 
-      <section
-        id="profilePage"
-        class="page"
-      >
+          <div class="profile-card profile-preview">
 
-        <div class="page-heading-row">
+            <div class="profile-avatar-large">
+              <img id="profileAvatar" alt="Profile" />
+            </div>
 
-          <div>
+            <h2 id="profileName">Your Name</h2>
 
-            <span class="eyebrow">
-              YOUR ACCOUNT
-            </span>
+            <p id="profileUsername">@username</p>
 
-            <h2>
-              Profile
-            </h2>
+            <div class="profile-id-box">
+              <span>Friend ID</span>
 
-            <p>
-              Manage your FriendZone profile.
-            </p>
+              <strong id="profileFriendId">—</strong>
 
-          </div>
-
-        </div>
-
-
-        <!-- PROFILE CARD -->
-
-        <div class="profile-card">
-
-          <div class="profile-cover">
-
-            <div class="profile-cover-glow"></div>
+              <button id="copyFriendIdBtn" type="button">
+                Copy
+              </button>
+            </div>
 
           </div>
 
 
-          <div class="profile-main">
+          <div class="profile-card">
 
-            <div class="profile-avatar-wrapper">
-
-              <div
-                id="profileAvatar"
-                class="profile-avatar"
-              >
-                U
+            <div class="section-heading">
+              <div>
+                <h2>Edit Profile</h2>
+                <p>Update your FriendZone profile.</p>
               </div>
-
             </div>
 
-
-            <div class="profile-info">
-
-              <h2 id="profileName">
-                User
-              </h2>
-
-              <p id="profileUsername">
-                @username
-              </p>
-
-
-              <div class="friend-id-display">
-
-                <span>
-                  Friend ID
-                </span>
-
-                <strong id="profileFriendId">
-                  FZ-000000
-                </strong>
-
-
-                <button
-                  id="copyFriendIdBtn"
-                  class="copy-btn"
-                  title="Copy Friend ID"
-                >
-                  ⧉
-                </button>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-
-        <!-- PROFILE SETTINGS -->
-
-        <div class="settings-card">
-
-          <div class="section-header">
-
-            <div>
-
-              <h3>
-                Profile Information
-              </h3>
-
-              <p>
-                Update your public profile details.
-              </p>
-
-            </div>
-
-          </div>
-
-
-          <form id="profileForm">
-
-            <div class="form-grid">
-
+            <form id="profileForm">
 
               <div class="input-group">
-
-                <label for="profileNameInput">
-                  Full Name
-                </label>
-
+                <label for="profileNameInput">Name</label>
                 <input
-                  type="text"
                   id="profileNameInput"
-                  maxlength="60"
+                  type="text"
                   required
                 />
-
               </div>
-
 
               <div class="input-group">
-
-                <label for="profileUsernameInput">
-                  Username
-                </label>
-
+                <label for="profileUsernameInput">Username</label>
                 <input
-                  type="text"
                   id="profileUsernameInput"
-                  maxlength="30"
+                  type="text"
                   required
                 />
-
               </div>
 
-            </div>
+              <button type="submit" class="primary-btn">
+                Save Changes
+              </button>
 
+            </form>
 
-            <button
-              type="submit"
-              class="primary-btn"
-            >
-              Save Changes
-            </button>
-
-          </form>
+          </div>
 
         </div>
 
@@ -1518,35 +645,21 @@
 
     </main>
 
-  </div>
+  </section>
 
 
-
-  <!-- =====================================================
-       FRIEND PROFILE MODAL
-  ====================================================== -->
-
-  <div
-    id="friendModal"
-    class="modal hidden"
-  >
-
-    <div
-      class="modal-overlay"
-      data-close-modal
-    ></div>
-
+  <!-- ================= FRIEND MODAL ================= -->
+  <div id="friendModal" class="modal-overlay hidden">
 
     <div class="modal-card">
 
       <button
         class="modal-close"
-        data-close-modal
-        aria-label="Close"
+        data-close-modal="friendModal"
+        type="button"
       >
         ×
       </button>
-
 
       <div id="modalFriendContent"></div>
 
@@ -1555,50 +668,26 @@
   </div>
 
 
+  <!-- ================= CONFIRM MODAL ================= -->
+  <div id="confirmModal" class="modal-overlay hidden">
 
-  <!-- =====================================================
-       CONFIRMATION MODAL
-  ====================================================== -->
+    <div class="modal-card confirm-card">
 
-  <div
-    id="confirmModal"
-    class="modal hidden"
-  >
+      <div class="confirm-icon">?</div>
 
-    <div class="modal-overlay"></div>
-
-
-    <div class="modal-card small-modal">
-
-      <div class="modal-icon">
-        ⚠
-      </div>
-
-
-      <h3 id="confirmTitle">
-        Are you sure?
-      </h3>
-
+      <h2 id="confirmTitle">Are you sure?</h2>
 
       <p id="confirmMessage">
         Please confirm this action.
       </p>
 
-
       <div class="modal-actions">
 
-        <button
-          id="confirmCancelBtn"
-          class="secondary-btn"
-        >
+        <button id="confirmCancelBtn" class="secondary-btn" type="button">
           Cancel
         </button>
 
-
-        <button
-          id="confirmActionBtn"
-          class="danger-btn"
-        >
+        <button id="confirmActionBtn" class="primary-btn" type="button">
           Confirm
         </button>
 
@@ -1609,55 +698,22 @@
   </div>
 
 
+  <!-- ================= TOAST ================= -->
+  <div id="toastContainer" class="toast-container"></div>
 
-  <!-- =====================================================
-       TOAST NOTIFICATIONS
-  ====================================================== -->
-
-  <div
-    id="toastContainer"
-    class="toast-container"
-  ></div>
-
-
-
-  <!-- =====================================================
-       SUPABASE CONFIG
-  ====================================================== -->
 
   <script>
-
-    /*
-     * FriendZone Supabase Configuration
-     *
-     * This is the PUBLIC client configuration.
-     *
-     * IMPORTANT:
-     * Never put a Supabase service_role/secret key here.
-     */
-
     const SUPABASE_URL =
       "https://hjdevuoxuoyenzmawwnb.supabase.co";
 
     const SUPABASE_ANON_KEY =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzIiwicmVmIjoiaGpkZXZ1b3h1b3llbnptYXd3bmIiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc4ODc4ODM2NiwiZXhwIjoyMTA0MzY0MzY2fQ.-ER4x0hqUYss521B_FWAHnfWjtxg9YJIaWNXjQJPPhI";
-
-    /*
-     * Make configuration available to script.js.
-     */
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IkFub24iLCJpYXQiOjE3ODg3ODgzNjYsImV4cCI6MjEwNDM2NDM2Nn0.-ER4x0hqUYss521B_FWAHnfWjtxg9YJIaWNXjQJPPhI";
 
     window.FRIENDZONE_CONFIG = {
       SUPABASE_URL,
       SUPABASE_ANON_KEY
     };
-
   </script>
-
-
-
-  <!-- =====================================================
-       FRIENDZONE JAVASCRIPT
-  ====================================================== -->
 
   <script src="script.js"></script>
 
