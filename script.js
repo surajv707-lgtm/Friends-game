@@ -10,7 +10,7 @@
    STORAGE
    ========================================================= */
 
-const STORAGE_KEY = "friendzone_database_v4";
+const STORAGE_KEY = "friendzone_database_v5";
 const CURRENT_USER_KEY = "friendzone_current_user_v4";
 const THEME_KEY = "friendzone_theme_v4";
 const SOUND_KEY = "friendzone_sound_v4";
