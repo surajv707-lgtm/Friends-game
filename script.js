@@ -1,37 +1,35 @@
 /* =========================================================
-   FRIENDZONE - PART 3
-   script.js
+   FRIENDZONE — FINAL SCRIPT
+   Auth • Friends • Best Friends • Games • XP • Leaderboard
+   Thoughts • Rooms • Profile • Theme • Sound • Confetti
    ========================================================= */
+
+"use strict";
 
 /* =========================================================
-   1. GLOBAL STATE & STORAGE
+   STORAGE
    ========================================================= */
 
-const STORAGE_KEY = "friendzone_data_v1";
-const CURRENT_USER_KEY = "friendzone_current_user";
-const THEME_KEY = "friendzone_theme";
-const SOUND_KEY = "friendzone_sound";
+const STORAGE_KEY = "friendzone_database_v4";
+const CURRENT_USER_KEY = "friendzone_current_user_v4";
+const THEME_KEY = "friendzone_theme_v4";
+const SOUND_KEY = "friendzone_sound_v4";
 
-let data = loadData();
+let db = loadDatabase();
 let currentUserId = localStorage.getItem(CURRENT_USER_KEY);
-let captchaAnswer = 0;
-let currentGame = null;
-let tapRushTimer = null;
-let tapRushCount = 0;
-let tapRushTime = 10;
-let memoryCards = [];
-let memoryFirst = null;
-let memorySecond = null;
-let memoryLock = false;
-let numberTarget = 0;
-let numberAttempts = 0;
-
+let currentLeaderboardType = "daily";
+let captchaAnswer = null;
+let tapGame = null;
+let memoryGame = null;
+let numberGame = null;
+let toastTimer = null;
+let audioContext = null;
 
 /* =========================================================
-   2. DEFAULT DATA
+   DEFAULT DATABASE
    ========================================================= */
 
-function defaultData() {
+function defaultDatabase() {
     return {
         users: [],
         friendRequests: [],
@@ -42,1191 +40,729 @@ function defaultData() {
     };
 }
 
-function loadData() {
+function loadDatabase() {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
 
         if (!saved) {
-            return defaultData();
+            return defaultDatabase();
         }
 
         const parsed = JSON.parse(saved);
 
         return {
-            ...defaultData(),
-            ...parsed
+            users: Array.isArray(parsed.users) ? parsed.users : [],
+            friendRequests: Array.isArray(parsed.friendRequests)
+                ? parsed.friendRequests
+                : [],
+            bestFriendRequests: Array.isArray(parsed.bestFriendRequests)
+                ? parsed.bestFriendRequests
+                : [],
+            rooms: Array.isArray(parsed.rooms) ? parsed.rooms : [],
+            activities: Array.isArray(parsed.activities)
+                ? parsed.activities
+                : [],
+            settings: parsed.settings || {}
         };
     } catch (error) {
-        console.error("Could not load FriendZone data:", error);
-        return defaultData();
+        console.error("Database load error:", error);
+        return defaultDatabase();
     }
 }
 
-function saveData() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+function saveDatabase() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+}
+
+function saveCurrentUser() {
+    if (currentUserId) {
+        localStorage.setItem(CURRENT_USER_KEY, currentUserId);
+    } else {
+        localStorage.removeItem(CURRENT_USER_KEY);
+    }
+}
+
+/* =========================================================
+   DOM HELPERS
+   ========================================================= */
+
+function $(id) {
+    return document.getElementById(id);
+}
+
+function $all(selector) {
+    return [...document.querySelectorAll(selector)];
+}
+
+function show(element) {
+    if (!element) return;
+    element.classList.remove("hidden");
+}
+
+function hide(element) {
+    if (!element) return;
+    element.classList.add("hidden");
 }
 
 function getCurrentUser() {
-    if (!currentUserId) return null;
-
-    return data.users.find(user => user.id === currentUserId) || null;
+    return db.users.find(user => user.id === currentUserId) || null;
 }
 
-function updateCurrentUser(callback) {
-    const user = getCurrentUser();
-
-    if (!user) return;
-
-    callback(user);
-    saveData();
-    renderEverything();
+function getUserById(id) {
+    return db.users.find(user => user.id === id) || null;
 }
 
+function getUserByFriendId(friendId) {
+    if (!friendId) return null;
+
+    return db.users.find(
+        user => user.friendId.toUpperCase() === friendId.trim().toUpperCase()
+    ) || null;
+}
 
 /* =========================================================
-   3. DOM HELPERS
+   ID / DATE HELPERS
    ========================================================= */
 
-function $(selector) {
-    return document.querySelector(selector);
+function makeId(prefix = "fz") {
+    return (
+        prefix +
+        "_" +
+        Date.now().toString(36) +
+        "_" +
+        Math.random().toString(36).slice(2, 10)
+    );
 }
 
-function $$(selector) {
-    return document.querySelectorAll(selector);
+function generateFriendId() {
+    let id;
+
+    do {
+        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        let part = "";
+
+        for (let i = 0; i < 2; i++) {
+            part += letters[Math.floor(Math.random() * letters.length)];
+        }
+
+        const numbers = Math.floor(100000 + Math.random() * 900000);
+
+        id = `FZ-${part}${numbers}`;
+    } while (getUserByFriendId(id));
+
+    return id;
 }
 
-function showElement(element) {
-    if (element) {
-        element.classList.remove("hidden");
-    }
+function localDateKey(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+
+    return `${y}-${m}-${d}`;
 }
 
-function hideElement(element) {
-    if (element) {
-        element.classList.add("hidden");
-    }
+function getWeekKey(date = new Date()) {
+    const temp = new Date(date);
+    temp.setHours(0, 0, 0, 0);
+
+    const day = temp.getDay() || 7;
+    temp.setDate(temp.getDate() - day + 1);
+
+    return localDateKey(temp);
 }
 
-function escapeHTML(value) {
-    return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
+function formatTime(timestamp) {
+    if (!timestamp) return "";
 
+    const date = new Date(timestamp);
+
+    return date.toLocaleString([], {
+        day: "numeric",
+        month: "short",
+        hour: "numeric",
+        minute: "2-digit"
+    });
+}
 
 /* =========================================================
-   4. TOAST
+   VALIDATION
    ========================================================= */
 
-function showToast(message, type = "info") {
-    let toast = $("#toast");
+function validEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
 
-    if (!toast) {
-        toast = document.createElement("div");
-        toast.id = "toast";
-        toast.className = "toast";
-        document.body.appendChild(toast);
-    }
+function validPassword(password) {
+    return (
+        typeof password === "string" &&
+        password.length >= 8 &&
+        /[A-Z]/.test(password) &&
+        /\d/.test(password)
+    );
+}
+
+function getInitials(name) {
+    if (!name) return "?";
+
+    return name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map(part => part[0])
+        .join("")
+        .toUpperCase();
+}
+
+/* =========================================================
+   TOAST
+   ========================================================= */
+
+function showToast(message, type = "success") {
+    const toast = $("toast");
+
+    if (!toast) return;
 
     toast.textContent = message;
     toast.className = `toast show ${type}`;
 
-    clearTimeout(toast._timer);
+    clearTimeout(toastTimer);
 
-    toast._timer = setTimeout(() => {
+    toastTimer = setTimeout(() => {
         toast.classList.remove("show");
     }, 2800);
 }
 
-
 /* =========================================================
-   5. MODALS
+   SOUND
    ========================================================= */
 
-function openModal(modal) {
-    if (!modal) return;
-
-    modal.classList.add("active");
-    modal.classList.remove("hidden");
-    document.body.classList.add("modal-open");
+function soundEnabled() {
+    return localStorage.getItem(SOUND_KEY) !== "off";
 }
 
-function closeModal(modal) {
-    if (!modal) return;
+function playSound(type = "click") {
+    if (!soundEnabled()) return;
 
-    modal.classList.remove("active");
+    try {
+        audioContext =
+            audioContext ||
+            new (window.AudioContext || window.webkitAudioContext)();
 
-    setTimeout(() => {
-        modal.classList.add("hidden");
-    }, 180);
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
 
-    document.body.classList.remove("modal-open");
-}
+        const settings = {
+            click: {
+                frequency: 420,
+                duration: 0.055
+            },
+            success: {
+                frequency: 660,
+                duration: 0.1
+            },
+            error: {
+                frequency: 170,
+                duration: 0.13
+            },
+            win: {
+                frequency: 820,
+                duration: 0.16
+            }
+        };
 
-function showGeneralModal(title, content) {
-    const modal = $("#generalModal");
+        const chosen = settings[type] || settings.click;
 
-    if (!modal) return;
+        oscillator.frequency.value = chosen.frequency;
+        oscillator.type = "sine";
 
-    const titleElement = modal.querySelector(".modal-title");
-    const bodyElement = modal.querySelector(".modal-body");
+        gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(
+            0.07,
+            audioContext.currentTime + 0.01
+        );
+        gain.gain.exponentialRampToValueAtTime(
+            0.0001,
+            audioContext.currentTime + chosen.duration
+        );
 
-    if (titleElement) {
-        titleElement.textContent = title;
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + chosen.duration);
+    } catch (error) {
+        console.warn("Audio unavailable.");
     }
-
-    if (bodyElement) {
-        bodyElement.innerHTML = content;
-    }
-
-    openModal(modal);
 }
 
+function updateSoundButton() {
+    const button = $("soundButton");
+
+    if (!button) return;
+
+    button.textContent = soundEnabled() ? "🔊" : "🔇";
+    button.title = soundEnabled() ? "Turn sound off" : "Turn sound on";
+}
 
 /* =========================================================
-   6. CAPTCHA
+   THEME
    ========================================================= */
 
-function generateCaptcha() {
-    const num1 = Math.floor(Math.random() * 9) + 1;
-    const num2 = Math.floor(Math.random() * 9) + 1;
+function setupTheme() {
+    const savedTheme = localStorage.getItem(THEME_KEY) || "dark";
 
-    captchaAnswer = num1 + num2;
+    document.documentElement.dataset.theme = savedTheme;
 
-    const question = $("#captchaQuestion");
+    const button = $("themeButton");
 
-    if (question) {
-        question.textContent = `${num1} + ${num2} = ?`;
-    }
-
-    const input = $("#captchaInput");
-
-    if (input) {
-        input.value = "";
+    if (button) {
+        button.textContent = savedTheme === "dark" ? "☀️" : "🌙";
     }
 }
 
-function verifyCaptcha() {
-    const input = $("#captchaInput");
+function toggleTheme() {
+    const current =
+        document.documentElement.dataset.theme === "light"
+            ? "light"
+            : "dark";
 
-    if (!input) return false;
+    const next = current === "dark" ? "light" : "dark";
 
-    return Number(input.value) === captchaAnswer;
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem(THEME_KEY, next);
+
+    const button = $("themeButton");
+
+    if (button) {
+        button.textContent = next === "dark" ? "☀️" : "🌙";
+    }
+
+    playSound("click");
 }
-
 
 /* =========================================================
-   7. PASSWORD VALIDATION
-   ========================================================= */
-
-function validatePassword(password) {
-    const errors = [];
-
-    if (password.length < 8) {
-        errors.push("at least 8 characters");
-    }
-
-    if (!/[A-Z]/.test(password)) {
-        errors.push("one capital letter");
-    }
-
-    if (!/[0-9]/.test(password)) {
-        errors.push("one number");
-    }
-
-    return errors;
-}
-
-
-/* =========================================================
-   8. FRIEND ID
-   ========================================================= */
-
-function generateFriendID() {
-    let friendID;
-
-    do {
-        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        const first =
-            letters[Math.floor(Math.random() * letters.length)] +
-            letters[Math.floor(Math.random() * letters.length)];
-
-        const numbers = Math.floor(100000 + Math.random() * 900000);
-
-        friendID = `FZ-${first}${numbers}`;
-    } while (data.users.some(user => user.friendId === friendID));
-
-    return friendID;
-}
-
-
-/* =========================================================
-   9. USER HELPERS
-   ========================================================= */
-
-function findUserByEmail(email) {
-    return data.users.find(
-        user => user.email.toLowerCase() === email.toLowerCase()
-    );
-}
-
-function findUserByFriendID(friendId) {
-    return data.users.find(
-        user => user.friendId.toLowerCase() === friendId.toLowerCase()
-    );
-}
-
-function getUserById(id) {
-    return data.users.find(user => user.id === id);
-}
-
-function createUser(name, email, password) {
-    const now = Date.now();
-
-    const user = {
-        id: crypto.randomUUID ? crypto.randomUUID() : `user_${now}_${Math.random()}`,
-        name,
-        email: email.toLowerCase(),
-        password,
-        friendId: generateFriendID(),
-
-        avatar: name.charAt(0).toUpperCase(),
-
-        friends: [],
-        bestFriends: [],
-
-        xp: 0,
-        level: 1,
-
-        gamesPlayed: 0,
-        gamesWon: 0,
-
-        streak: 0,
-        lastActiveDate: null,
-
-        thoughts: [],
-
-        achievements: [],
-
-        createdAt: now
-    };
-
-    data.users.push(user);
-
-    saveData();
-
-    return user;
-}
-
-
-/* =========================================================
-   10. AUTHENTICATION - FIXED VERSION
+   AUTH
    ========================================================= */
 
 function setupAuthentication() {
+    const signInTab = $("signInTab");
+    const signUpTab = $("signUpTab");
 
-    // -----------------------------
-    // SIGN IN / SIGN UP TABS
-    // -----------------------------
+    const signInForm = $("signInForm");
+    const signUpForm = $("signUpForm");
 
-    const signInTab =
-        document.getElementById("signInTab");
-
-    const signUpTab =
-        document.getElementById("signUpTab");
-
-    const signInForm =
-        document.getElementById("signInForm");
-
-    const signUpForm =
-        document.getElementById("signUpForm");
-
-
-    // SIGN IN TAB
-    if (signInTab) {
-        signInTab.addEventListener("click", function (e) {
-
-            e.preventDefault();
-
-            signInTab.classList.add("active");
-
-            if (signUpTab) {
-                signUpTab.classList.remove("active");
-            }
-
-            if (signInForm) {
-                signInForm.classList.remove("hidden");
-                signInForm.style.display = "";
-            }
-
-            if (signUpForm) {
-                signUpForm.classList.add("hidden");
-                signUpForm.style.display = "none";
-            }
-        });
-    }
-
-
-    // SIGN UP TAB
-    if (signUpTab) {
-        signUpTab.addEventListener("click", function (e) {
-
-            e.preventDefault();
-
-            signUpTab.classList.add("active");
-
-            if (signInTab) {
-                signInTab.classList.remove("active");
-            }
-
-            if (signUpForm) {
-                signUpForm.classList.remove("hidden");
-                signUpForm.style.display = "";
-            }
-
-            if (signInForm) {
-                signInForm.classList.add("hidden");
-                signInForm.style.display = "none";
-            }
-
-            generateCaptcha();
-        });
-    }
-
-
-    // -----------------------------
-    // SIGN IN FORM
-    // -----------------------------
-
-    if (signInForm) {
-
-        signInForm.addEventListener(
-            "submit",
-            function (event) {
-
-                event.preventDefault();
-
-                const emailElement =
-                    document.getElementById("signinEmail");
-
-                const passwordElement =
-                    document.getElementById("signinPassword");
-
-                if (!emailElement || !passwordElement) {
-                    showToast(
-                        "Login fields are missing from the page.",
-                        "error"
-                    );
-
-                    console.error(
-                        "signinEmail or signinPassword not found."
-                    );
-
-                    return;
-                }
-
-                const email =
-                    emailElement.value.trim().toLowerCase();
-
-                const password =
-                    passwordElement.value;
-
-
-                if (!email) {
-                    showToast(
-                        "Please enter your email.",
-                        "error"
-                    );
-                    return;
-                }
-
-                if (!password) {
-                    showToast(
-                        "Please enter your password.",
-                        "error"
-                    );
-                    return;
-                }
-
-
-                const user =
-                    data.users.find(
-                        function (item) {
-                            return (
-                                item.email.toLowerCase() ===
-                                email
-                            );
-                        }
-                    );
-
-
-                if (!user) {
-                    showToast(
-                        "No account found with this email.",
-                        "error"
-                    );
-                    return;
-                }
-
-
-                if (user.password !== password) {
-                    showToast(
-                        "Incorrect password.",
-                        "error"
-                    );
-                    return;
-                }
-
-
-                // LOGIN SUCCESS
-                currentUserId = user.id;
-
-                localStorage.setItem(
-                    CURRENT_USER_KEY,
-                    user.id
-                );
-
-                updateStreak(user);
-
-                showApp();
-
-                showToast(
-                    `Welcome back, ${user.name}!`,
-                    "success"
-                );
-
-                playSound("success");
-            }
-        );
-    }
-
-
-    // -----------------------------
-    // SIGN UP FORM
-    // -----------------------------
-
-    if (signUpForm) {
-
-        signUpForm.addEventListener(
-            "submit",
-            function (event) {
-
-                event.preventDefault();
-
-                const nameElement =
-                    document.getElementById("signupName");
-
-                const emailElement =
-                    document.getElementById("signupEmail");
-
-                const passwordElement =
-                    document.getElementById("signupPassword");
-
-
-                if (
-                    !nameElement ||
-                    !emailElement ||
-                    !passwordElement
-                ) {
-                    showToast(
-                        "Signup fields are missing from the page.",
-                        "error"
-                    );
-
-                    console.error(
-                        "Signup input IDs are missing."
-                    );
-
-                    return;
-                }
-
-
-                const name =
-                    nameElement.value.trim();
-
-                const email =
-                    emailElement.value
-                        .trim()
-                        .toLowerCase();
-
-                const password =
-                    passwordElement.value;
-
-
-                // NAME
-                if (name.length < 2) {
-                    showToast(
-                        "Please enter your name.",
-                        "error"
-                    );
-                    return;
-                }
-
-
-                // EMAIL
-                if (
-                    !email ||
-                    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-                ) {
-                    showToast(
-                        "Please enter a valid email.",
-                        "error"
-                    );
-                    return;
-                }
-
-
-                // EXISTING ACCOUNT
-                if (findUserByEmail(email)) {
-                    showToast(
-                        "This email is already registered.",
-                        "error"
-                    );
-                    return;
-                }
-
-
-                // PASSWORD
-                const passwordErrors =
-                    validatePassword(password);
-
-
-                if (passwordErrors.length > 0) {
-
-                    showToast(
-                        "Password needs " +
-                        passwordErrors.join(", ") +
-                        ".",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                // CAPTCHA
-                if (!verifyCaptcha()) {
-
-                    showToast(
-                        "Incorrect CAPTCHA answer.",
-                        "error"
-                    );
-
-                    generateCaptcha();
-
-                    return;
-                }
-
-
-                // CREATE USER
-                const user =
-                    createUser(
-                        name,
-                        email,
-                        password
-                    );
-
-
-                currentUserId =
-                    user.id;
-
-
-                localStorage.setItem(
-                    CURRENT_USER_KEY,
-                    user.id
-                );
-
-
-                updateStreak(user);
-
-                showApp();
-
-
-                showToast(
-                    `Welcome to FriendZone, ${user.name}!`,
-                    "success"
-                );
-
-
-                playSound("success");
-
-                launchConfetti();
-            }
-        );
-    }
-
-
-    // -----------------------------
-    // FORGOT PASSWORD
-    // -----------------------------
-
-    const forgotButton =
-        document.getElementById("forgotPassword");
-
-
-    if (forgotButton) {
-
-        forgotButton.addEventListener(
-            "click",
-            function (event) {
-
-                event.preventDefault();
-
-                openForgotPasswordModal();
-            }
-        );
-    }
-
-
-    // Generate CAPTCHA initially
-    generateCaptcha();
-}
-
-
-/* =========================================================
-   CAPTCHA - FIXED
-   ========================================================= */
-
-function generateCaptcha() {
-
-    const number1 =
-        Math.floor(Math.random() * 9) + 1;
-
-    const number2 =
-        Math.floor(Math.random() * 9) + 1;
-
-
-    captchaAnswer =
-        number1 + number2;
-
-
-    const question =
-        document.getElementById(
-            "captchaQuestion"
-        );
-
-
-    if (question) {
-        question.textContent =
-            `${number1} + ${number2} = ?`;
-    }
-
-
-    const input =
-        document.getElementById(
-            "captchaInput"
-        );
-
-
-    if (input) {
-        input.value = "";
-    }
-}
-
-
-function verifyCaptcha() {
-
-    const input =
-        document.getElementById(
-            "captchaInput"
-        );
-
-
-    if (!input) {
-
-        console.error(
-            "captchaInput was not found."
-        );
-
-        return false;
-    }
-
-
-    return (
-        Number(input.value) ===
-        Number(captchaAnswer)
-    );
-}
-
-
-/* =========================================================
-   PASSWORD VALIDATION
-   ========================================================= */
-
-function validatePassword(password) {
-
-    const errors = [];
-
-
-    if (password.length < 8) {
-        errors.push(
-            "at least 8 characters"
-        );
-    }
-
-
-    if (!/[A-Z]/.test(password)) {
-        errors.push(
-            "one capital letter"
-        );
-    }
-
-
-    if (!/[0-9]/.test(password)) {
-        errors.push(
-            "one number"
-        );
-    }
-
-
-    return errors;
-}
-
-
-/* =========================================================
-   FORGOT PASSWORD - COMPLETELY FIXED
-   ========================================================= */
-
-function openForgotPasswordModal() {
-
-    const modal =
-        document.getElementById(
-            "generalModal"
-        );
-
-
-    if (!modal) {
-
-        showToast(
-            "Password reset window is missing.",
-            "error"
-        );
-
-        console.error(
-            "generalModal not found."
-        );
-
+    if (!signInTab || !signUpTab || !signInForm || !signUpForm) {
+        console.error("Authentication elements missing.");
         return;
     }
 
+    signInTab.addEventListener("click", event => {
+        event.preventDefault();
 
-    const title =
-        modal.querySelector(
-            ".modal-title"
-        );
+        signInTab.classList.add("active");
+        signUpTab.classList.remove("active");
 
+        signInForm.classList.remove("hidden");
+        signUpForm.classList.add("hidden");
 
-    const body =
-        modal.querySelector(
-            ".modal-body"
-        );
+        if ($("authTitle")) {
+            $("authTitle").textContent = "Welcome Back";
+        }
 
+        if ($("authSubtitle")) {
+            $("authSubtitle").textContent =
+                "Sign in to continue your FriendZone journey.";
+        }
 
-    if (title) {
-        title.textContent =
-            "Reset Password";
+        playSound("click");
+    });
+
+    signUpTab.addEventListener("click", event => {
+        event.preventDefault();
+
+        signUpTab.classList.add("active");
+        signInTab.classList.remove("active");
+
+        signUpForm.classList.remove("hidden");
+        signInForm.classList.add("hidden");
+
+        if ($("authTitle")) {
+            $("authTitle").textContent = "Create Account";
+        }
+
+        if ($("authSubtitle")) {
+            $("authSubtitle").textContent =
+                "Create your account and start connecting.";
+        }
+
+        generateCaptcha();
+        playSound("click");
+    });
+
+    signInForm.addEventListener("submit", event => {
+        event.preventDefault();
+        signIn();
+    });
+
+    signUpForm.addEventListener("submit", event => {
+        event.preventDefault();
+        signUp();
+    });
+
+    $("forgotPassword")?.addEventListener("click", event => {
+        event.preventDefault();
+        openForgotPassword();
+    });
+
+    $("refreshCaptcha")?.addEventListener("click", event => {
+        event.preventDefault();
+        generateCaptcha();
+        playSound("click");
+    });
+
+    generateCaptcha();
+}
+
+function signIn() {
+    const email = $("signinEmail")?.value.trim().toLowerCase();
+    const password = $("signinPassword")?.value;
+
+    if (!email || !password) {
+        showToast("Please enter email and password.", "error");
+        playSound("error");
+        return;
     }
 
+    const user = db.users.find(
+        item => item.email.toLowerCase() === email
+    );
 
-    if (body) {
-
-        body.innerHTML = `
-
-            <div class="reset-password-box">
-
-                <p>
-                    Enter your registered email address.
-                </p>
-
-                <input
-                    id="resetEmail"
-                    class="input"
-                    type="email"
-                    placeholder="Registered email"
-                    autocomplete="email"
-                >
-
-                <button
-                    type="button"
-                    class="btn btn-primary full-width"
-                    id="verifyResetEmail"
-                >
-                    Verify Email
-                </button>
-
-
-                <div
-                    id="resetStepTwo"
-                    class="hidden"
-                    style="display:none;"
-                >
-
-                    <br>
-
-                    <input
-                        id="newResetPassword"
-                        class="input"
-                        type="password"
-                        placeholder="New password"
-                        autocomplete="new-password"
-                    >
-
-                    <br>
-
-                    <button
-                        type="button"
-                        class="btn btn-primary full-width"
-                        id="resetPasswordBtn"
-                    >
-                        Reset Password
-                    </button>
-
-                </div>
-
-            </div>
-        `;
+    if (!user) {
+        showToast("No account found with this email.", "error");
+        playSound("error");
+        return;
     }
 
-
-    openModal(modal);
-
-
-    // VERIFY EMAIL
-    const verifyButton =
-        document.getElementById(
-            "verifyResetEmail"
-        );
-
-
-    if (verifyButton) {
-
-        verifyButton.onclick =
-            function () {
-
-                const emailElement =
-                    document.getElementById(
-                        "resetEmail"
-                    );
-
-
-                const email =
-                    emailElement.value
-                        .trim()
-                        .toLowerCase();
-
-
-                if (!email) {
-
-                    showToast(
-                        "Please enter your email.",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                const user =
-                    findUserByEmail(email);
-
-
-                if (!user) {
-
-                    showToast(
-                        "This email is not registered.",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                // EMAIL FOUND
-                const stepTwo =
-                    document.getElementById(
-                        "resetStepTwo"
-                    );
-
-
-                if (stepTwo) {
-
-                    stepTwo.classList.remove(
-                        "hidden"
-                    );
-
-                    stepTwo.style.display =
-                        "block";
-                }
-
-
-                verifyButton.disabled =
-                    true;
-
-                verifyButton.textContent =
-                    "Email Verified ✓";
-
-
-                showToast(
-                    "Email verified. Enter your new password.",
-                    "success"
-                );
-            };
+    if (user.password !== password) {
+        showToast("Incorrect password.", "error");
+        playSound("error");
+        return;
     }
 
+    currentUserId = user.id;
+    saveCurrentUser();
 
-    // RESET PASSWORD
-    const resetButton =
-        document.getElementById(
-            "resetPasswordBtn"
+    updateStreak(user);
+
+    saveDatabase();
+
+    showApp();
+
+    showToast(`Welcome back, ${user.name}!`);
+    playSound("success");
+}
+
+function signUp() {
+    const name = $("signupName")?.value.trim();
+    const email = $("signupEmail")?.value.trim().toLowerCase();
+    const password = $("signupPassword")?.value;
+    const captchaInput = $("captchaInput")?.value.trim();
+
+    if (!name || name.length < 2) {
+        showToast("Please enter a valid name.", "error");
+        playSound("error");
+        return;
+    }
+
+    if (!validEmail(email)) {
+        showToast("Please enter a valid email address.", "error");
+        playSound("error");
+        return;
+    }
+
+    if (db.users.some(user => user.email.toLowerCase() === email)) {
+        showToast("An account with this email already exists.", "error");
+        playSound("error");
+        return;
+    }
+
+    if (!validPassword(password)) {
+        showToast(
+            "Password needs 8+ characters, 1 capital letter and 1 number.",
+            "error"
         );
+        playSound("error");
+        return;
+    }
 
+    if (Number(captchaInput) !== captchaAnswer) {
+        showToast("Incorrect CAPTCHA answer.", "error");
+        generateCaptcha();
+        playSound("error");
+        return;
+    }
 
-    if (resetButton) {
+    const user = {
+        id: makeId("user"),
+        name,
+        email,
+        password,
+        friendId: generateFriendId(),
+        avatar: "",
+        friends: [],
+        bestFriends: [],
+        xp: 0,
+        xpDaily: 0,
+        xpWeekly: 0,
+        dailyDate: localDateKey(),
+        weeklyDate: getWeekKey(),
+        level: 1,
+        gamesPlayed: 0,
+        gamesWon: 0,
+        streak: 1,
+        lastActiveDate: localDateKey(),
+        thoughts: [],
+        achievements: [],
+        createdAt: Date.now()
+    };
 
-        resetButton.onclick =
-            function () {
+    db.users.push(user);
 
-                const emailElement =
-                    document.getElementById(
-                        "resetEmail"
-                    );
+    currentUserId = user.id;
+    saveCurrentUser();
 
+    saveDatabase();
 
-                const passwordElement =
-                    document.getElementById(
-                        "newResetPassword"
-                    );
+    showApp();
 
+    showToast(
+        `Account created! Your Friend ID is ${user.friendId}`
+    );
 
-                const email =
-                    emailElement.value
-                        .trim()
-                        .toLowerCase();
+    playSound("win");
+    launchConfetti();
+}
 
+/* =========================================================
+   CAPTCHA
+   ========================================================= */
 
-                const newPassword =
-                    passwordElement.value;
+function generateCaptcha() {
+    const a = Math.floor(Math.random() * 9) + 2;
+    const b = Math.floor(Math.random() * 9) + 2;
 
+    captchaAnswer = a + b;
 
-                const user =
-                    findUserByEmail(email);
+    if ($("captchaQuestion")) {
+        $("captchaQuestion").textContent = `${a} + ${b} = ?`;
+    }
 
-
-                if (!user) {
-
-                    showToast(
-                        "Please verify your registered email first.",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                const errors =
-                    validatePassword(
-                        newPassword
-                    );
-
-
-                if (errors.length > 0) {
-
-                    showToast(
-                        "Password needs " +
-                        errors.join(", ") +
-                        ".",
-                        "error"
-                    );
-
-                    return;
-                }
-
-
-                user.password =
-                    newPassword;
-
-
-                saveData();
-
-
-                closeModal(modal);
-
-
-                showToast(
-                    "Password successfully reset! You can now sign in.",
-                    "success"
-                );
-
-
-                playSound("success");
-            };
+    if ($("captchaInput")) {
+        $("captchaInput").value = "";
     }
 }
 
-
 /* =========================================================
-   11. FORGOT PASSWORD
+   FORGOT PASSWORD
    ========================================================= */
 
-function showForgotPassword() {
-    showGeneralModal(
+function openForgotPassword() {
+    openModal(
         "Reset Password",
         `
-        <div class="reset-password-box">
-            <p>Enter your registered email address.</p>
+        <div>
+            <p>
+                Enter the email address registered with your FriendZone account.
+            </p>
 
             <input
                 id="resetEmail"
                 class="input"
                 type="email"
                 placeholder="Registered email"
+                autocomplete="email"
             >
 
-            <button class="btn btn-primary full-width" id="verifyResetEmail">
+            <button
+                id="verifyResetEmail"
+                class="btn btn-primary"
+                type="button"
+                style="width:100%;margin-top:12px;"
+            >
                 Verify Email
             </button>
 
-            <div id="resetStepTwo" class="hidden">
-                <br>
-
+            <div id="resetPasswordArea" class="hidden">
                 <input
                     id="newResetPassword"
                     class="input"
                     type="password"
                     placeholder="New password"
+                    autocomplete="new-password"
+                    style="margin-top:10px;"
                 >
 
-                <button class="btn btn-primary full-width" id="resetPasswordBtn">
-                    Reset Password
+                <p style="margin-top:7px;font-size:.7rem;">
+                    Minimum 8 characters, 1 capital letter and 1 number.
+                </p>
+
+                <button
+                    id="saveNewPassword"
+                    class="btn btn-primary"
+                    type="button"
+                    style="width:100%;margin-top:12px;"
+                >
+                    Save New Password
                 </button>
             </div>
         </div>
         `
     );
 
-    $("#verifyResetEmail")?.addEventListener("click", () => {
-        const email = $("#resetEmail")?.value.trim();
+    $("verifyResetEmail")?.addEventListener("click", verifyResetEmail);
+}
 
-        const user = findUserByEmail(email);
+function verifyResetEmail() {
+    const email = $("resetEmail")?.value.trim().toLowerCase();
 
-        if (!user) {
+    const user = db.users.find(
+        item => item.email.toLowerCase() === email
+    );
+
+    if (!user) {
+        showToast("That email is not registered.", "error");
+        playSound("error");
+        return;
+    }
+
+    showToast("Email verified.");
+
+    const area = $("resetPasswordArea");
+
+    if (area) {
+        area.classList.remove("hidden");
+    }
+
+    $("saveNewPassword")?.addEventListener("click", () => {
+        const newPassword = $("newResetPassword")?.value || "";
+
+        if (!validPassword(newPassword)) {
             showToast(
-                "This email is not registered.",
+                "Password needs 8+ characters, 1 capital letter and 1 number.",
                 "error"
             );
+            playSound("error");
             return;
         }
 
-        $("#resetStepTwo")?.classList.remove("hidden");
+        user.password = newPassword;
 
-        showToast(
-            "Email verified. Enter your new password.",
-            "success"
-        );
+        saveDatabase();
+
+        closeModal();
+
+        showToast("Password changed successfully.");
+        playSound("success");
     });
-
-    document.addEventListener(
-        "click",
-        handleResetPasswordClick,
-        {
-            once: true
-        }
-    );
 }
-
-function handleResetPasswordClick(event) {
-    if (!event.target.matches("#resetPasswordBtn")) return;
-
-    const email = $("#resetEmail")?.value.trim();
-    const newPassword = $("#newResetPassword")?.value;
-
-    const user = findUserByEmail(email);
-
-    if (!user) {
-        showToast("Email verification failed.", "error");
-        return;
-    }
-
-    const errors = validatePassword(newPassword);
-
-    if (errors.length) {
-        showToast(
-            `Password needs ${errors.join(", ")}.`,
-            "error"
-        );
-        return;
-    }
-
-    user.password = newPassword;
-
-    saveData();
-
-    closeModal($("#generalModal"));
-
-    showToast(
-        "Password successfully reset.",
-        "success"
-    );
-}
-
 
 /* =========================================================
-   12. LOGOUT
+   APP SHOW / LOGOUT
    ========================================================= */
 
-function logout() {
-    localStorage.removeItem(CURRENT_USER_KEY);
-    currentUserId = null;
+function showApp() {
+    const authScreen = $("authScreen");
+    const appShell = $("appShell");
 
-    showAuth();
+    if (!currentUserId || !getCurrentUser()) {
+        show(authScreen);
+        hide(appShell);
+        return;
+    }
 
-    showToast(
-        "You have been logged out.",
-        "success"
-    );
+    hide(authScreen);
+    show(appShell);
+
+    updateStreak(getCurrentUser());
+    renderEverything();
 }
 
+function logout() {
+    currentUserId = null;
+    localStorage.removeItem(CURRENT_USER_KEY);
+
+    closeModal();
+
+    show($("authScreen"));
+    hide($("appShell"));
+
+    if ($("signinForm")) {
+        $("signinForm").reset();
+    }
+
+    if ($("signInTab")) {
+        $("signInTab").click();
+    }
+
+    showToast("You have been logged out.");
+    playSound("click");
+}
 
 /* =========================================================
-   13. NAVIGATION
+   NAVIGATION
    ========================================================= */
 
 function setupNavigation() {
-    $$(".nav-link").forEach(link => {
-        link.addEventListener("click", () => {
-            const target = link.dataset.section;
+    $all(".nav-link[data-section]").forEach(button => {
+        button.addEventListener("click", event => {
+            event.preventDefault();
 
-            if (!target) return;
+            const section = button.dataset.section;
 
-            navigateTo(target);
+            navigateTo(section);
+
+            $("mainNav")?.classList.remove("open");
         });
     });
 
-    $$("[data-go]").forEach(button => {
-        button.addEventListener("click", () => {
-            navigateTo(button.dataset.go);
+    $all("[data-go]").forEach(button => {
+        button.addEventListener("click", event => {
+            event.preventDefault();
+
+            const section = button.dataset.go;
+
+            if (section) {
+                navigateTo(section);
+            }
         });
+    });
+
+    $("menuButton")?.addEventListener("click", event => {
+        event.preventDefault();
+
+        $("mainNav")?.classList.toggle("open");
+        playSound("click");
     });
 }
 
-function navigateTo(sectionName) {
-    $$(".app-section").forEach(section => {
-        section.classList.remove("active");
-    });
+function navigateTo(sectionId) {
+    const section = $(sectionId);
 
-    const target = $(`#${sectionName}`);
-
-    if (target) {
-        target.classList.add("active");
+    if (!section) {
+        console.warn(`Section "${sectionId}" does not exist.`);
+        return;
     }
 
-    $$(".nav-link").forEach(link => {
+    $all(".app-section").forEach(item => {
+        item.classList.remove("active");
+    });
+
+    section.classList.add("active");
+
+    $all(".nav-link").forEach(link => {
         link.classList.toggle(
             "active",
-            link.dataset.section === sectionName
+            link.dataset.section === sectionId
         );
     });
 
@@ -1235,267 +771,11 @@ function navigateTo(sectionName) {
         behavior: "smooth"
     });
 
-    renderEverything();
-}
-
-
-/* =========================================================
-   14. MOBILE NAVIGATION
-   ========================================================= */
-
-function setupMobileNavigation() {
-    const menuButton = $("#menuButton");
-    const nav = $("#mainNav");
-
-    if (!menuButton || !nav) return;
-
-    menuButton.addEventListener("click", () => {
-        nav.classList.toggle("open");
-    });
-
-    $$(".nav-link").forEach(link => {
-        link.addEventListener("click", () => {
-            nav.classList.remove("open");
-        });
-    });
-}
-
-
-/* =========================================================
-   15. THEME
-   ========================================================= */
-
-function setupTheme() {
-    const savedTheme =
-        localStorage.getItem(THEME_KEY) || "dark";
-
-    applyTheme(savedTheme);
-
-    $("#themeButton")?.addEventListener(
-        "click",
-        toggleTheme
-    );
-}
-
-function applyTheme(theme) {
-    document.documentElement.dataset.theme = theme;
-
-    localStorage.setItem(
-        THEME_KEY,
-        theme
-    );
-
-    const button = $("#themeButton");
-
-    if (button) {
-        button.innerHTML =
-            theme === "dark"
-                ? "☀️"
-                : "🌙";
-    }
-}
-
-function toggleTheme() {
-    const current =
-        document.documentElement.dataset.theme ||
-        "dark";
-
-    const next =
-        current === "dark"
-            ? "light"
-            : "dark";
-
-    applyTheme(next);
-
     playSound("click");
 }
 
-
 /* =========================================================
-   16. SOUND SYSTEM
-   ========================================================= */
-
-let audioContext = null;
-
-function isSoundEnabled() {
-    return localStorage.getItem(SOUND_KEY) !== "off";
-}
-
-function setupSound() {
-    updateSoundButton();
-
-    $("#soundButton")?.addEventListener(
-        "click",
-        toggleSound
-    );
-}
-
-function toggleSound() {
-    const enabled = isSoundEnabled();
-
-    localStorage.setItem(
-        SOUND_KEY,
-        enabled ? "off" : "on"
-    );
-
-    updateSoundButton();
-
-    if (!enabled) {
-        playSound("success");
-    }
-}
-
-function updateSoundButton() {
-    const button = $("#soundButton");
-
-    if (!button) return;
-
-    button.innerHTML =
-        isSoundEnabled()
-            ? "🔊"
-            : "🔇";
-}
-
-function getAudioContext() {
-    if (!audioContext) {
-        const AudioCtx =
-            window.AudioContext ||
-            window.webkitAudioContext;
-
-        if (!AudioCtx) return null;
-
-        audioContext = new AudioCtx();
-    }
-
-    return audioContext;
-}
-
-function playSound(type = "click") {
-    if (!isSoundEnabled()) return;
-
-    const ctx = getAudioContext();
-
-    if (!ctx) return;
-
-    const oscillator =
-        ctx.createOscillator();
-
-    const gain =
-        ctx.createGain();
-
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-
-    let frequency = 500;
-
-    if (type === "success") {
-        frequency = 700;
-    }
-
-    if (type === "error") {
-        frequency = 180;
-    }
-
-    if (type === "win") {
-        frequency = 850;
-    }
-
-    oscillator.frequency.value = frequency;
-    oscillator.type = "sine";
-
-    gain.gain.setValueAtTime(
-        0.0001,
-        ctx.currentTime
-    );
-
-    gain.gain.exponentialRampToValueAtTime(
-        0.08,
-        ctx.currentTime + 0.01
-    );
-
-    gain.gain.exponentialRampToValueAtTime(
-        0.0001,
-        ctx.currentTime + 0.18
-    );
-
-    oscillator.start();
-    oscillator.stop(
-        ctx.currentTime + 0.2
-    );
-}
-
-
-/* =========================================================
-   17. STREAK SYSTEM
-   ========================================================= */
-
-function getTodayString() {
-    const date = new Date();
-
-    return date.toISOString().split("T")[0];
-}
-
-function getYesterdayString() {
-    const date = new Date();
-
-    date.setDate(date.getDate() - 1);
-
-    return date.toISOString().split("T")[0];
-}
-
-function updateStreak(user) {
-    const today = getTodayString();
-
-    if (!user.lastActiveDate) {
-        user.streak = 1;
-        user.lastActiveDate = today;
-    } else if (user.lastActiveDate === today) {
-        return;
-    } else if (user.lastActiveDate === getYesterdayString()) {
-        user.streak += 1;
-        user.lastActiveDate = today;
-    } else {
-        user.streak = 1;
-        user.lastActiveDate = today;
-    }
-
-    saveData();
-}
-
-
-/* =========================================================
-   18. XP / LEVEL
-   ========================================================= */
-
-function addXP(amount) {
-    const user = getCurrentUser();
-
-    if (!user) return;
-
-    const oldLevel = user.level;
-
-    user.xp += amount;
-
-    user.level =
-        Math.floor(user.xp / 500) + 1;
-
-    saveData();
-
-    if (user.level > oldLevel) {
-        playSound("win");
-
-        launchConfetti();
-
-        showToast(
-            `🎉 Level Up! You are now Level ${user.level}!`,
-            "success"
-        );
-    }
-}
-
-
-/* =========================================================
-   19. FRIEND SYSTEM
+   FRIEND SYSTEM
    ========================================================= */
 
 function areFriends(userA, userB) {
@@ -1508,1398 +788,1321 @@ function areFriends(userA, userB) {
 }
 
 function pendingFriendRequest(fromId, toId) {
-    return data.friendRequests.find(
+    return db.friendRequests.find(
         request =>
-            request.from === fromId &&
-            request.to === toId &&
+            request.fromId === fromId &&
+            request.toId === toId &&
             request.status === "pending"
     );
 }
 
-function sendFriendRequest(friendId) {
-    const currentUser = getCurrentUser();
+function setupFriendSystem() {
+    $("sendFriendRequest")?.addEventListener(
+        "click",
+        sendFriendRequest
+    );
 
-    if (!currentUser) {
-        showToast("Please sign in first.", "error");
+    $("copyFriendId")?.addEventListener("click", () => {
+        copyText(getCurrentUser()?.friendId || "");
+    });
+
+    $("friendIdInput")?.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            sendFriendRequest();
+        }
+    });
+
+    $("createRoom")?.addEventListener("click", createRoom);
+    $("joinRoom")?.addEventListener("click", joinRoom);
+
+    $("joinRoomInput")?.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            joinRoom();
+        }
+    });
+
+    $("copyRoomCode")?.addEventListener("click", () => {
+        copyText($("roomCode")?.textContent || "");
+    });
+}
+
+function sendFriendRequest() {
+    const current = getCurrentUser();
+
+    if (!current) return;
+
+    const friendId = $("friendIdInput")?.value.trim().toUpperCase();
+
+    if (!friendId) {
+        showToast("Enter a Friend ID first.", "error");
+        playSound("error");
         return;
     }
 
-    const targetUser =
-        findUserByFriendID(friendId);
+    if (friendId === current.friendId.toUpperCase()) {
+        showToast("You cannot add yourself.", "error");
+        playSound("error");
+        return;
+    }
 
-    if (!targetUser) {
+    const target = getUserByFriendId(friendId);
+
+    if (!target) {
+        showToast("Friend ID not found.", "error");
+        playSound("error");
+        return;
+    }
+
+    if (areFriends(current, target)) {
+        showToast("You are already friends.", "error");
+        playSound("error");
+        return;
+    }
+
+    if (pendingFriendRequest(current.id, target.id)) {
+        showToast("Friend request already sent.", "error");
+        playSound("error");
+        return;
+    }
+
+    if (pendingFriendRequest(target.id, current.id)) {
         showToast(
-            "Friend ID not found.",
+            "This person already sent you a request. Check requests.",
             "error"
         );
+        playSound("error");
         return;
     }
 
-    if (targetUser.id === currentUser.id) {
-        showToast(
-            "You cannot add yourself.",
-            "error"
-        );
-        return;
-    }
-
-    if (areFriends(currentUser, targetUser)) {
-        showToast(
-            "You are already friends.",
-            "info"
-        );
-        return;
-    }
-
-    if (
-        pendingFriendRequest(
-            currentUser.id,
-            targetUser.id
-        )
-    ) {
-        showToast(
-            "Friend request already sent.",
-            "info"
-        );
-        return;
-    }
-
-    if (
-        pendingFriendRequest(
-            targetUser.id,
-            currentUser.id
-        )
-    ) {
-        showToast(
-            "This person already sent you a request.",
-            "info"
-        );
-        return;
-    }
-
-    data.friendRequests.push({
-        id:
-            crypto.randomUUID?.() ||
-            `request_${Date.now()}`,
-        from: currentUser.id,
-        to: targetUser.id,
+    db.friendRequests.push({
+        id: makeId("request"),
+        fromId: current.id,
+        toId: target.id,
         status: "pending",
         createdAt: Date.now()
     });
 
-    saveData();
+    saveDatabase();
 
-    showToast(
-        `Friend request sent to ${targetUser.name}!`,
-        "success"
-    );
+    $("friendIdInput").value = "";
 
-    renderEverything();
+    renderFriends();
+    updateFriendRequestBadge();
+
+    showToast(`Friend request sent to ${target.name}!`);
+    playSound("success");
 }
 
 function acceptFriendRequest(requestId) {
-    const request =
-        data.friendRequests.find(
-            item => item.id === requestId
-        );
+    const current = getCurrentUser();
+
+    if (!current) return;
+
+    const request = db.friendRequests.find(
+        item =>
+            item.id === requestId &&
+            item.toId === current.id &&
+            item.status === "pending"
+    );
 
     if (!request) return;
 
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || request.to !== currentUser.id) {
-        return;
-    }
-
-    const sender =
-        getUserById(request.from);
+    const sender = getUserById(request.fromId);
 
     if (!sender) return;
 
-    if (!currentUser.friends.includes(sender.id)) {
-        currentUser.friends.push(sender.id);
+    if (!current.friends.includes(sender.id)) {
+        current.friends.push(sender.id);
     }
 
-    if (!sender.friends.includes(currentUser.id)) {
-        sender.friends.push(currentUser.id);
+    if (!sender.friends.includes(current.id)) {
+        sender.friends.push(current.id);
+    }
+
+    request.status = "accepted";
+    request.acceptedAt = Date.now();
+
+    addXP(current, 50, false);
+
+    saveDatabase();
+
+    renderEverything();
+
+    showToast(`${sender.name} is now your friend!`);
+    playSound("success");
+    launchConfetti();
+}
+
+function rejectFriendRequest(requestId) {
+    const current = getCurrentUser();
+
+    if (!current) return;
+
+    const request = db.friendRequests.find(
+        item =>
+            item.id === requestId &&
+            item.toId === current.id &&
+            item.status === "pending"
+    );
+
+    if (!request) return;
+
+    request.status = "rejected";
+
+    saveDatabase();
+
+    renderEverything();
+
+    showToast("Friend request rejected.");
+    playSound("click");
+}
+
+function removeFriend(friendId) {
+    const current = getCurrentUser();
+    const friend = getUserById(friendId);
+
+    if (!current || !friend) return;
+
+    current.friends = current.friends.filter(id => id !== friend.id);
+    friend.friends = friend.friends.filter(id => id !== current.id);
+
+    current.bestFriends = current.bestFriends.filter(
+        id => id !== friend.id
+    );
+
+    friend.bestFriends = friend.bestFriends.filter(
+        id => id !== current.id
+    );
+
+    saveDatabase();
+    renderEverything();
+
+    showToast(`${friend.name} removed from friends.`);
+}
+
+function toggleBestFriend(friendId) {
+    const current = getCurrentUser();
+    const friend = getUserById(friendId);
+
+    if (!current || !friend) return;
+
+    if (!areFriends(current, friend)) {
+        showToast("You can only add a friend to Best Friends.", "error");
+        return;
+    }
+
+    const isBest = current.bestFriends.includes(friend.id);
+
+    if (isBest) {
+        current.bestFriends = current.bestFriends.filter(
+            id => id !== friend.id
+        );
+
+        showToast(`${friend.name} removed from Best Friends.`);
+    } else {
+        current.bestFriends.push(friend.id);
+
+        addAchievement(current, "best_friend");
+
+        showToast(`${friend.name} added to Best Friends!`);
+        launchConfetti();
+    }
+
+    saveDatabase();
+    renderEverything();
+}
+
+/* =========================================================
+   FRIEND DETAILS
+   ========================================================= */
+
+function openFriendDetails(friendId) {
+    const current = getCurrentUser();
+    const friend = getUserById(friendId);
+
+    if (!current || !friend) return;
+
+    if (!areFriends(current, friend)) {
+        showToast(
+            "Friend details are available after accepting the request.",
+            "error"
+        );
+        return;
+    }
+
+    const best =
+        current.bestFriends.includes(friend.id);
+
+    openModal(
+        friend.name,
+        `
+        <div style="text-align:center;">
+            <div class="profile-avatar" style="width:72px;height:72px;font-size:1.1rem;">
+                ${friend.avatar
+                    ? `<img src="${escapeHTML(friend.avatar)}" alt="">`
+                    : escapeHTML(getInitials(friend.name))}
+            </div>
+
+            <h3 style="margin-top:12px;">
+                ${escapeHTML(friend.name)}
+            </h3>
+
+            <p style="margin-top:5px;">
+                Friend ID: ${escapeHTML(friend.friendId)}
+            </p>
+
+            <p style="margin-top:8px;">
+                Level ${friend.level} • ${friend.xp} XP
+            </p>
+
+            <p style="margin-top:6px;">
+                🔥 ${friend.streak} day streak
+            </p>
+
+            ${
+                best
+                    ? `<p style="margin-top:10px;color:var(--pink);font-weight:800;">
+                        💖 Best Friend
+                       </p>`
+                    : ""
+            }
+        </div>
+        `
+    );
+}
+
+/* =========================================================
+   BEST FRIEND REQUESTS
+   ========================================================= */
+
+function sendBestFriendRequest(friendId) {
+    const current = getCurrentUser();
+    const friend = getUserById(friendId);
+
+    if (!current || !friend) return;
+
+    if (!areFriends(current, friend)) {
+        showToast("You must be friends first.", "error");
+        return;
+    }
+
+    if (current.bestFriends.includes(friend.id)) {
+        showToast("Already in Best Friends.");
+        return;
+    }
+
+    const exists = db.bestFriendRequests.find(
+        request =>
+            request.fromId === current.id &&
+            request.toId === friend.id &&
+            request.status === "pending"
+    );
+
+    if (exists) {
+        showToast("Best Friend request already sent.", "error");
+        return;
+    }
+
+    db.bestFriendRequests.push({
+        id: makeId("best"),
+        fromId: current.id,
+        toId: friend.id,
+        status: "pending",
+        createdAt: Date.now()
+    });
+
+    saveDatabase();
+
+    showToast(`Best Friend request sent to ${friend.name}!`);
+}
+
+function acceptBestFriendRequest(requestId) {
+    const current = getCurrentUser();
+
+    if (!current) return;
+
+    const request = db.bestFriendRequests.find(
+        item =>
+            item.id === requestId &&
+            item.toId === current.id &&
+            item.status === "pending"
+    );
+
+    if (!request) return;
+
+    const sender = getUserById(request.fromId);
+
+    if (!sender || !areFriends(current, sender)) return;
+
+    if (!current.bestFriends.includes(sender.id)) {
+        current.bestFriends.push(sender.id);
+    }
+
+    if (!sender.bestFriends.includes(current.id)) {
+        sender.bestFriends.push(current.id);
     }
 
     request.status = "accepted";
 
-    saveData();
+    addAchievement(current, "best_friend");
 
-    addXP(30);
+    saveDatabase();
+    renderEverything();
 
-    showToast(
-        `🎉 You and ${sender.name} are now friends!`,
-        "success"
-    );
-
+    showToast(`${sender.name} is now your Best Friend!`);
+    playSound("win");
     launchConfetti();
-
-    renderEverything();
 }
-
-function rejectFriendRequest(requestId) {
-    const request =
-        data.friendRequests.find(
-            item => item.id === requestId
-        );
-
-    if (!request) return;
-
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || request.to !== currentUser.id) {
-        return;
-    }
-
-    request.status = "rejected";
-
-    saveData();
-
-    showToast(
-        "Friend request rejected.",
-        "info"
-    );
-
-    renderEverything();
-}
-
-function removeFriend(friendId) {
-    const currentUser = getCurrentUser();
-    const friend = getUserById(friendId);
-
-    if (!currentUser || !friend) return;
-
-    currentUser.friends =
-        currentUser.friends.filter(
-            id => id !== friend.id
-        );
-
-    friend.friends =
-        friend.friends.filter(
-            id => id !== currentUser.id
-        );
-
-    currentUser.bestFriends =
-        currentUser.bestFriends.filter(
-            id => id !== friend.id
-        );
-
-    friend.bestFriends =
-        friend.bestFriends.filter(
-            id => id !== currentUser.id
-        );
-
-    saveData();
-
-    showToast(
-        `${friend.name} removed from friends.`,
-        "info"
-    );
-
-    renderEverything();
-}
-
 
 /* =========================================================
-   20. BEST FRIEND SYSTEM
+   XP / LEVEL
    ========================================================= */
 
-function isBestFriend(user, friendId) {
-    return user.bestFriends.includes(friendId);
+function refreshXPPeriods(user) {
+    const today = localDateKey();
+    const week = getWeekKey();
+
+    if (user.dailyDate !== today) {
+        user.dailyDate = today;
+        user.xpDaily = 0;
+    }
+
+    if (user.weeklyDate !== week) {
+        user.weeklyDate = week;
+        user.xpWeekly = 0;
+    }
 }
 
-function toggleBestFriend(friendId) {
-    const user = getCurrentUser();
-    const friend = getUserById(friendId);
+function addXP(user, amount, showMessage = true) {
+    if (!user || amount <= 0) return;
 
-    if (!user || !friend) return;
+    refreshXPPeriods(user);
 
-    if (!areFriends(user, friend)) {
-        showToast(
-            "You can only choose a friend as Best Friend.",
-            "error"
-        );
-        return;
-    }
+    user.xp += amount;
+    user.xpDaily += amount;
+    user.xpWeekly += amount;
 
-    if (isBestFriend(user, friendId)) {
-        user.bestFriends =
-            user.bestFriends.filter(
-                id => id !== friendId
-            );
+    const oldLevel = user.level;
 
-        saveData();
-
-        showToast(
-            `${friend.name} removed from Best Friends.`,
-            "info"
-        );
-
-        renderEverything();
-        return;
-    }
-
-    user.bestFriends.push(friendId);
-
-    saveData();
-
-    addXP(20);
-
-    showToast(
-        `⭐ ${friend.name} added to Best Friends!`,
-        "success"
+    user.level = Math.max(
+        1,
+        Math.floor(user.xp / 250) + 1
     );
 
-    renderEverything();
-}
+    if (user.level > oldLevel) {
+        if (showMessage) {
+            showToast(`🎉 Level up! You reached Level ${user.level}!`);
+            launchConfetti();
+            playSound("win");
+        }
+    }
 
+    if (user.level >= 5) {
+        addAchievement(user, "level_five");
+    }
+
+    saveDatabase();
+}
 
 /* =========================================================
-   21. FRIEND SEARCH
+   STREAK
    ========================================================= */
 
-function setupFriendSystem() {
-    $("#sendFriendRequest")?.addEventListener(
-        "click",
-        () => {
-            const input = $("#friendIdInput");
-
-            if (!input) return;
-
-            sendFriendRequest(
-                input.value.trim()
-            );
-
-            input.value = "";
-        }
-    );
-
-    $("#friendIdInput")?.addEventListener(
-        "keydown",
-        event => {
-            if (event.key === "Enter") {
-                $("#sendFriendRequest")?.click();
-            }
-        }
-    );
-
-    document.addEventListener(
-        "click",
-        event => {
-            const acceptButton =
-                event.target.closest(
-                    "[data-accept-request]"
-                );
-
-            if (acceptButton) {
-                acceptFriendRequest(
-                    acceptButton.dataset.acceptRequest
-                );
-            }
-
-            const rejectButton =
-                event.target.closest(
-                    "[data-reject-request]"
-                );
-
-            if (rejectButton) {
-                rejectFriendRequest(
-                    rejectButton.dataset.rejectRequest
-                );
-            }
-
-            const removeButton =
-                event.target.closest(
-                    "[data-remove-friend]"
-                );
-
-            if (removeButton) {
-                removeFriend(
-                    removeButton.dataset.removeFriend
-                );
-            }
-
-            const bestButton =
-                event.target.closest(
-                    "[data-best-friend]"
-                );
-
-            if (bestButton) {
-                toggleBestFriend(
-                    bestButton.dataset.bestFriend
-                );
-            }
-        }
-    );
-}
-
-
-/* =========================================================
-   22. FRIEND THOUGHTS
-   ========================================================= */
-
-function addThought() {
-    const input =
-        $("#thoughtInput");
-
-    if (!input) return;
-
-    const text =
-        input.value.trim();
-
-    if (!text) {
-        showToast(
-            "Write something first.",
-            "error"
-        );
-        return;
-    }
-
-    if (text.length > 160) {
-        showToast(
-            "Thought must be under 160 characters.",
-            "error"
-        );
-        return;
-    }
-
-    const user = getCurrentUser();
-
+function updateStreak(user) {
     if (!user) return;
 
-    user.thoughts.unshift({
-        id:
-            crypto.randomUUID?.() ||
-            `thought_${Date.now()}`,
-        text,
-        createdAt: Date.now()
-    });
+    const today = localDateKey();
 
-    user.thoughts =
-        user.thoughts.slice(0, 5);
+    if (!user.lastActiveDate) {
+        user.lastActiveDate = today;
+        user.streak = 1;
+        return;
+    }
 
-    saveData();
+    if (user.lastActiveDate === today) {
+        return;
+    }
 
-    input.value = "";
+    const last = new Date(user.lastActiveDate + "T00:00:00");
+    const current = new Date(today + "T00:00:00");
 
-    addXP(5);
+    const difference =
+        Math.round((current - last) / 86400000);
 
-    showToast(
-        "Thought posted!",
-        "success"
-    );
+    if (difference === 1) {
+        user.streak = (user.streak || 0) + 1;
+    } else {
+        user.streak = 1;
+    }
 
-    renderEverything();
+    user.lastActiveDate = today;
+
+    if (user.streak >= 7) {
+        addAchievement(user, "streak_seven");
+    }
+
+    saveDatabase();
 }
 
-
 /* =========================================================
-   23. ACHIEVEMENTS
+   ACHIEVEMENTS
    ========================================================= */
 
-const ACHIEVEMENTS = [
-    {
-        id: "first_friend",
+const ACHIEVEMENTS = {
+    first_friend: {
         title: "First Friend",
         description: "Make your first friend.",
         icon: "🤝"
     },
-    {
-        id: "five_friends",
+
+    five_friends: {
         title: "Social Star",
-        description: "Have 5 friends.",
+        description: "Reach 5 friends.",
         icon: "⭐"
     },
-    {
-        id: "best_friend",
-        title: "Bestie",
-        description: "Choose a Best Friend.",
-        icon: "💜"
+
+    best_friend: {
+        title: "Besties",
+        description: "Add someone to Best Friends.",
+        icon: "💖"
     },
-    {
-        id: "first_game",
-        title: "Game On",
+
+    first_game: {
+        title: "Game Starter",
         description: "Play your first game.",
         icon: "🎮"
     },
-    {
-        id: "game_winner",
+
+    game_winner: {
         title: "Winner",
-        description: "Win a game.",
+        description: "Win your first game.",
         icon: "🏆"
     },
-    {
-        id: "level_five",
-        title: "Rising Star",
+
+    level_five: {
+        title: "Level 5",
         description: "Reach Level 5.",
         icon: "🚀"
     },
-    {
-        id: "streak_seven",
+
+    streak_seven: {
         title: "7 Day Streak",
         description: "Maintain a 7 day streak.",
         icon: "🔥"
     }
-];
+};
 
-function checkAchievements() {
-    const user = getCurrentUser();
+function addAchievement(user, key) {
+    if (!user || !ACHIEVEMENTS[key]) return;
 
+    if (!Array.isArray(user.achievements)) {
+        user.achievements = [];
+    }
+
+    if (!user.achievements.includes(key)) {
+        user.achievements.push(key);
+        saveDatabase();
+    }
+}
+
+function checkAchievements(user) {
     if (!user) return;
 
-    const checks = {
-        first_friend:
-            user.friends.length >= 1,
+    if (user.friends.length >= 1) {
+        addAchievement(user, "first_friend");
+    }
 
-        five_friends:
-            user.friends.length >= 5,
+    if (user.friends.length >= 5) {
+        addAchievement(user, "five_friends");
+    }
 
-        best_friend:
-            user.bestFriends.length >= 1,
+    if (user.gamesPlayed >= 1) {
+        addAchievement(user, "first_game");
+    }
 
-        first_game:
-            user.gamesPlayed >= 1,
+    if (user.gamesWon >= 1) {
+        addAchievement(user, "game_winner");
+    }
 
-        game_winner:
-            user.gamesWon >= 1,
+    if (user.level >= 5) {
+        addAchievement(user, "level_five");
+    }
 
-        level_five:
-            user.level >= 5,
+    if (user.streak >= 7) {
+        addAchievement(user, "streak_seven");
+    }
 
-        streak_seven:
-            user.streak >= 7
-    };
-
-    Object.entries(checks).forEach(
-        ([achievementId, unlocked]) => {
-            if (
-                unlocked &&
-                !user.achievements.includes(
-                    achievementId
-                )
-            ) {
-                user.achievements.push(
-                    achievementId
-                );
-
-                const achievement =
-                    ACHIEVEMENTS.find(
-                        item =>
-                            item.id ===
-                            achievementId
-                    );
-
-                if (achievement) {
-                    showToast(
-                        `${achievement.icon} Achievement unlocked: ${achievement.title}`,
-                        "success"
-                    );
-
-                    launchConfetti();
-                }
-            }
-        }
-    );
-
-    saveData();
+    if (user.bestFriends.length >= 1) {
+        addAchievement(user, "best_friend");
+    }
 }
-
 
 /* =========================================================
-   24. GAME SYSTEM
+   GAMES
    ========================================================= */
 
-function openGame(gameName) {
-    currentGame = gameName;
+function setupGames() {
+    $all("[data-game]").forEach(card => {
+        card.addEventListener("click", event => {
+            event.preventDefault();
 
-    const modal =
-        $("#gameModal");
+            const game = card.dataset.game;
 
-    if (!modal) return;
-
-    const title =
-        modal.querySelector(".game-modal-title");
-
-    const body =
-        modal.querySelector(".game-modal-body");
-
-    if (title) {
-        title.textContent =
-            getGameTitle(gameName);
-    }
-
-    if (body) {
-        body.innerHTML =
-            getGameHTML(gameName);
-    }
-
-    openModal(modal);
-
-    initializeGame(gameName);
-}
-
-function getGameTitle(gameName) {
-    const titles = {
-        tapRush: "⚡ Tap Rush",
-        memoryMatch: "🧠 Memory Match",
-        numberGuess: "🔢 Number Guess"
-    };
-
-    return titles[gameName] || "FriendZone Game";
-}
-
-function getGameHTML(gameName) {
-    if (gameName === "tapRush") {
-        return `
-            <div class="game-screen tap-rush-game">
-                <p>Tap as many times as you can in 10 seconds!</p>
-
-                <div class="game-score">
-                    Score:
-                    <strong id="tapScore">0</strong>
-                </div>
-
-                <div class="game-timer">
-                    Time:
-                    <strong id="tapTimer">10</strong>
-                </div>
-
-                <button
-                    id="tapButton"
-                    class="game-action-button"
-                >
-                    TAP!
-                </button>
-
-                <p id="tapMessage">
-                    Press Start to begin.
-                </p>
-
-                <button
-                    id="tapStart"
-                    class="btn btn-primary"
-                >
-                    Start Game
-                </button>
-            </div>
-        `;
-    }
-
-    if (gameName === "memoryMatch") {
-        return `
-            <div class="game-screen">
-                <p>Find all matching pairs.</p>
-
-                <div
-                    id="memoryBoard"
-                    class="memory-board"
-                ></div>
-
-                <p id="memoryMessage">
-                    Find the matching cards!
-                </p>
-            </div>
-        `;
-    }
-
-    if (gameName === "numberGuess") {
-        return `
-            <div class="game-screen">
-                <p>Guess the number between 1 and 100.</p>
-
-                <input
-                    id="guessInput"
-                    class="input"
-                    type="number"
-                    min="1"
-                    max="100"
-                    placeholder="Enter number"
-                >
-
-                <button
-                    id="guessButton"
-                    class="btn btn-primary"
-                >
-                    Guess
-                </button>
-
-                <p>
-                    Attempts:
-                    <strong id="guessAttempts">0</strong>
-                </p>
-
-                <p id="guessMessage">
-                    Good luck!
-                </p>
-
-                <button
-                    id="guessRestart"
-                    class="btn btn-secondary"
-                >
-                    New Number
-                </button>
-            </div>
-        `;
-    }
-
-    return `
-        <div class="game-screen">
-            <p>Game coming soon!</p>
-        </div>
-    `;
-}
-
-function initializeGame(gameName) {
-    if (gameName === "tapRush") {
-        setupTapRush();
-    }
-
-    if (gameName === "memoryMatch") {
-        setupMemoryMatch();
-    }
-
-    if (gameName === "numberGuess") {
-        setupNumberGuess();
-    }
-}
-
-
-/* =========================================================
-   25. TAP RUSH
-   ========================================================= */
-
-function setupTapRush() {
-    tapRushCount = 0;
-    tapRushTime = 10;
-
-    $("#tapButton")?.addEventListener(
-        "click",
-        () => {
-            if (!tapRushTimer) return;
-
-            tapRushCount++;
-
-            const score =
-                $("#tapScore");
-
-            if (score) {
-                score.textContent =
-                    tapRushCount;
+            if (game === "tapRush") {
+                openTapRush();
             }
 
-            playSound("click");
-        }
-    );
-
-    $("#tapStart")?.addEventListener(
-        "click",
-        startTapRush
-    );
-}
-
-function startTapRush() {
-    if (tapRushTimer) return;
-
-    tapRushCount = 0;
-    tapRushTime = 10;
-
-    $("#tapScore").textContent = "0";
-    $("#tapTimer").textContent = "10";
-    $("#tapMessage").textContent =
-        "GO! GO! GO!";
-
-    $("#tapStart").disabled = true;
-
-    tapRushTimer =
-        setInterval(() => {
-            tapRushTime--;
-
-            const timer =
-                $("#tapTimer");
-
-            if (timer) {
-                timer.textContent =
-                    tapRushTime;
+            if (game === "memoryMatch") {
+                openMemoryMatch();
             }
 
-            if (tapRushTime <= 0) {
-                finishTapRush();
+            if (game === "numberGuess") {
+                openNumberGuess();
             }
-        }, 1000);
+        });
+    });
 }
 
-function finishTapRush() {
-    clearInterval(tapRushTimer);
-
-    tapRushTimer = null;
-
+function gamePlayed(win, xpAmount) {
     const user = getCurrentUser();
 
     if (!user) return;
 
     user.gamesPlayed++;
 
-    let won = false;
-
-    if (tapRushCount >= 35) {
-        won = true;
-    }
-
-    if (won) {
+    if (win) {
         user.gamesWon++;
-
-        addXP(50);
-
-        playSound("win");
-
-        launchConfetti();
-
-        $("#tapMessage").textContent =
-            `🏆 Amazing! You scored ${tapRushCount}!`;
-    } else {
-        addXP(15);
-
-        playSound("success");
-
-        $("#tapMessage").textContent =
-            `Nice! You scored ${tapRushCount}. Try beating 35!`;
     }
 
-    saveData();
+    addXP(user, xpAmount, false);
 
-    checkAchievements();
+    checkAchievements(user);
 
-    $("#tapStart").disabled = false;
-    $("#tapStart").textContent =
-        "Play Again";
-
+    saveDatabase();
     renderEverything();
 }
 
-
 /* =========================================================
-   26. MEMORY MATCH
+   TAP RUSH
    ========================================================= */
 
-function setupMemoryMatch() {
-    const symbols = [
-        "🔥",
-        "⭐",
-        "💜",
-        "🎮",
-        "🚀",
-        "⚡"
-    ];
+function openTapRush() {
+    tapGame = {
+        score: 0,
+        time: 10,
+        running: false,
+        timer: null
+    };
 
-    memoryCards =
-        [...symbols, ...symbols]
-            .sort(() => Math.random() - 0.5)
-            .map((symbol, index) => ({
-                id: index,
-                symbol,
-                flipped: false,
-                matched: false
-            }));
+    openGameModal(
+        "⚡ Tap Rush",
+        `
+        <div class="game-screen">
+            <div class="game-status">
+                <div class="game-stat">
+                    <div class="game-stat-label">SCORE</div>
+                    <div id="tapScore" class="game-stat-value">0</div>
+                </div>
 
-    memoryFirst = null;
-    memorySecond = null;
-    memoryLock = false;
+                <div class="game-stat">
+                    <div class="game-stat-label">TIME</div>
+                    <div id="tapTime" class="game-stat-value">10</div>
+                </div>
+            </div>
+
+            <p>
+                Tap as fast as possible before the timer reaches zero!
+            </p>
+
+            <button id="tapButton" class="tap-button" type="button">
+                TAP!
+            </button>
+
+            <div>
+                <button id="startTapGame" class="game-action-button" type="button">
+                    Start Game
+                </button>
+            </div>
+        </div>
+        `
+    );
+
+    $("startTapGame")?.addEventListener("click", startTapRush);
+
+    $("tapButton")?.addEventListener("click", () => {
+        if (!tapGame || !tapGame.running) return;
+
+        tapGame.score++;
+
+        if ($("tapScore")) {
+            $("tapScore").textContent = tapGame.score;
+        }
+
+        playSound("click");
+    });
+}
+
+function startTapRush() {
+    if (!tapGame) return;
+
+    tapGame.running = true;
+    tapGame.score = 0;
+    tapGame.time = 10;
+
+    $("tapScore").textContent = "0";
+    $("tapTime").textContent = "10";
+
+    $("startTapGame").disabled = true;
+
+    clearInterval(tapGame.timer);
+
+    tapGame.timer = setInterval(() => {
+        tapGame.time--;
+
+        if ($("tapTime")) {
+            $("tapTime").textContent = tapGame.time;
+        }
+
+        if (tapGame.time <= 0) {
+            clearInterval(tapGame.timer);
+
+            tapGame.running = false;
+
+            const score = tapGame.score;
+            const win = score >= 35;
+            const xp = win ? 80 : Math.min(40, score);
+
+            gamePlayed(win, xp);
+
+            if (win) {
+                showToast(`🏆 You won Tap Rush! +${xp} XP`);
+                playSound("win");
+                launchConfetti();
+            } else {
+                showToast(
+                    `Good try! You scored ${score}. Need 35 to win.`,
+                    "error"
+                );
+                playSound("error");
+            }
+
+            if ($("startTapGame")) {
+                $("startTapGame").disabled = false;
+                $("startTapGame").textContent = "Play Again";
+            }
+        }
+    }, 1000);
+}
+
+/* =========================================================
+   MEMORY MATCH
+   ========================================================= */
+
+function openMemoryMatch() {
+    const symbols = ["🌟", "🚀", "🎮", "🔥", "💎", "🎯"];
+
+    const cards = [...symbols, ...symbols]
+        .sort(() => Math.random() - 0.5)
+        .map((symbol, index) => ({
+            id: index,
+            symbol,
+            flipped: false,
+            matched: false
+        }));
+
+    memoryGame = {
+        cards,
+        first: null,
+        second: null,
+        lock: false,
+        matches: 0
+    };
+
+    openGameModal(
+        "🧠 Memory Match",
+        `
+        <div class="game-screen">
+            <div class="game-status">
+                <div class="game-stat">
+                    <div class="game-stat-label">MATCHES</div>
+                    <div id="memoryMatches" class="game-stat-value">0 / 6</div>
+                </div>
+
+                <div class="game-stat">
+                    <div class="game-stat-label">PAIRS</div>
+                    <div class="game-stat-value">6</div>
+                </div>
+            </div>
+
+            <p>Find all six matching pairs.</p>
+
+            <div id="memoryBoard" class="memory-board"></div>
+        </div>
+        `
+    );
 
     renderMemoryBoard();
 }
 
 function renderMemoryBoard() {
-    const board =
-        $("#memoryBoard");
+    const board = $("memoryBoard");
 
-    if (!board) return;
+    if (!board || !memoryGame) return;
 
-    board.innerHTML =
-        memoryCards.map(card => `
-            <button
-                class="memory-card ${
-                    card.flipped ||
-                    card.matched
-                        ? "flipped"
-                        : ""
-                } ${
-                    card.matched
-                        ? "matched"
-                        : ""
-                }"
-                data-memory-id="${card.id}"
-            >
-                <span>
-                    ${
-                        card.flipped ||
-                        card.matched
-                            ? card.symbol
-                            : "?"
-                    }
-                </span>
-            </button>
-        `).join("");
+    board.innerHTML = memoryGame.cards
+        .map(card => {
+            const visible =
+                card.flipped || card.matched;
 
-    $$(".memory-card").forEach(card => {
-        card.addEventListener(
-            "click",
-            () => {
-                flipMemoryCard(
-                    Number(
-                        card.dataset.memoryId
-                    )
-                );
-            }
-        );
+            return `
+                <button
+                    class="memory-card ${
+                        visible ? "flipped" : ""
+                    } ${card.matched ? "matched" : ""}"
+                    data-memory-id="${card.id}"
+                    type="button"
+                >
+                    ${visible ? escapeHTML(card.symbol) : "?"}
+                </button>
+            `;
+        })
+        .join("");
+
+    $all("[data-memory-id]").forEach(button => {
+        button.addEventListener("click", () => {
+            flipMemoryCard(Number(button.dataset.memoryId));
+        });
     });
 }
 
 function flipMemoryCard(id) {
-    if (memoryLock) return;
+    if (!memoryGame || memoryGame.lock) return;
 
-    const card =
-        memoryCards.find(
-            item => item.id === id
-        );
+    const card = memoryGame.cards.find(item => item.id === id);
 
-    if (!card) return;
-
-    if (
-        card.flipped ||
-        card.matched
-    ) {
-        return;
-    }
+    if (!card || card.flipped || card.matched) return;
 
     card.flipped = true;
 
-    playSound("click");
-
-    if (!memoryFirst) {
-        memoryFirst = card;
-
+    if (!memoryGame.first) {
+        memoryGame.first = card;
         renderMemoryBoard();
-
+        playSound("click");
         return;
     }
 
-    memorySecond = card;
+    memoryGame.second = card;
+    memoryGame.lock = true;
 
     renderMemoryBoard();
 
-    memoryLock = true;
+    if (memoryGame.first.symbol === memoryGame.second.symbol) {
+        memoryGame.first.matched = true;
+        memoryGame.second.matched = true;
 
-    setTimeout(() => {
-        if (
-            memoryFirst.symbol ===
-            memorySecond.symbol
-        ) {
-            memoryFirst.matched = true;
-            memorySecond.matched = true;
+        memoryGame.matches++;
 
-            playSound("success");
-
-            $("#memoryMessage").textContent =
-                "✨ Match found!";
-        } else {
-            memoryFirst.flipped = false;
-            memorySecond.flipped = false;
-
-            $("#memoryMessage").textContent =
-                "Try again!";
+        if ($("memoryMatches")) {
+            $("memoryMatches").textContent =
+                `${memoryGame.matches} / 6`;
         }
 
-        memoryFirst = null;
-        memorySecond = null;
-        memoryLock = false;
+        memoryGame.first = null;
+        memoryGame.second = null;
+        memoryGame.lock = false;
+
+        playSound("success");
 
         renderMemoryBoard();
 
-        checkMemoryComplete();
-    }, 600);
+        if (memoryGame.matches === 6) {
+            gamePlayed(true, 100);
+
+            showToast("🏆 Memory Master! +100 XP");
+            playSound("win");
+            launchConfetti();
+        }
+    } else {
+        setTimeout(() => {
+            memoryGame.first.flipped = false;
+            memoryGame.second.flipped = false;
+
+            memoryGame.first = null;
+            memoryGame.second = null;
+            memoryGame.lock = false;
+
+            renderMemoryBoard();
+        }, 650);
+    }
 }
-
-function checkMemoryComplete() {
-    const complete =
-        memoryCards.every(
-            card => card.matched
-        );
-
-    if (!complete) return;
-
-    const user = getCurrentUser();
-
-    if (!user) return;
-
-    user.gamesPlayed++;
-    user.gamesWon++;
-
-    addXP(60);
-
-    saveData();
-
-    checkAchievements();
-
-    playSound("win");
-
-    launchConfetti();
-
-    $("#memoryMessage").textContent =
-        "🏆 You matched everything!";
-}
-
 
 /* =========================================================
-   27. NUMBER GUESS
+   NUMBER GUESS
    ========================================================= */
 
-function setupNumberGuess() {
-    startNumberGuess();
+function openNumberGuess() {
+    numberGame = {
+        target: Math.floor(Math.random() * 100) + 1,
+        attempts: 0,
+        finished: false
+    };
 
-    $("#guessButton")?.addEventListener(
-        "click",
-        submitGuess
+    openGameModal(
+        "🎯 Number Guess",
+        `
+        <div class="game-screen">
+            <div class="game-status">
+                <div class="game-stat">
+                    <div class="game-stat-label">RANGE</div>
+                    <div class="game-stat-value">1–100</div>
+                </div>
+
+                <div class="game-stat">
+                    <div class="game-stat-label">ATTEMPTS</div>
+                    <div id="guessAttempts" class="game-stat-value">0</div>
+                </div>
+            </div>
+
+            <p>Guess the hidden number between 1 and 100.</p>
+
+            <input
+                id="guessInput"
+                class="input number-input"
+                type="number"
+                min="1"
+                max="100"
+                placeholder="Your guess"
+            >
+
+            <div>
+                <button
+                    id="guessButton"
+                    class="game-action-button"
+                    type="button"
+                >
+                    Guess
+                </button>
+            </div>
+
+            <p id="guessMessage" style="margin-top:14px;"></p>
+        </div>
+        `
     );
 
-    $("#guessInput")?.addEventListener(
-        "keydown",
-        event => {
-            if (event.key === "Enter") {
-                submitGuess();
-            }
+    $("guessButton")?.addEventListener("click", makeGuess);
+
+    $("guessInput")?.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            makeGuess();
         }
-    );
-
-    $("#guessRestart")?.addEventListener(
-        "click",
-        startNumberGuess
-    );
+    });
 }
 
-function startNumberGuess() {
-    numberTarget =
-        Math.floor(
-            Math.random() * 100
-        ) + 1;
+function makeGuess() {
+    if (!numberGame || numberGame.finished) return;
 
-    numberAttempts = 0;
+    const input = $("guessInput");
+    const message = $("guessMessage");
 
-    if ($("#guessAttempts")) {
-        $("#guessAttempts").textContent =
-            "0";
-    }
+    const guess = Number(input?.value);
 
-    if ($("#guessMessage")) {
-        $("#guessMessage").textContent =
-            "Good luck!";
-    }
-
-    if ($("#guessInput")) {
-        $("#guessInput").value = "";
-    }
-}
-
-function submitGuess() {
-    const input =
-        $("#guessInput");
-
-    if (!input) return;
-
-    const guess =
-        Number(input.value);
-
-    if (
-        !guess ||
-        guess < 1 ||
-        guess > 100
-    ) {
-        showToast(
-            "Enter a number from 1 to 100.",
-            "error"
-        );
+    if (!Number.isInteger(guess) || guess < 1 || guess > 100) {
+        showToast("Enter a number from 1 to 100.", "error");
         return;
     }
 
-    numberAttempts++;
+    numberGame.attempts++;
 
-    $("#guessAttempts").textContent =
-        numberAttempts;
+    if ($("guessAttempts")) {
+        $("guessAttempts").textContent =
+            numberGame.attempts;
+    }
 
-    if (guess === numberTarget) {
-        const user = getCurrentUser();
+    if (guess === numberGame.target) {
+        numberGame.finished = true;
 
-        if (user) {
-            user.gamesPlayed++;
-            user.gamesWon++;
+        const xp = Math.max(
+            35,
+            100 - numberGame.attempts * 10
+        );
 
-            const xp =
-                Math.max(
-                    20,
-                    80 -
-                    numberAttempts * 5
-                );
+        gamePlayed(true, xp);
 
-            addXP(xp);
-
-            saveData();
-
-            checkAchievements();
+        if (message) {
+            message.textContent =
+                `🎉 Correct! The number was ${numberGame.target}.`;
         }
 
-        $("#guessMessage").textContent =
-            `🎉 Correct! The number was ${numberTarget}!`;
-
+        showToast(`🏆 You won! +${xp} XP`);
         playSound("win");
-
         launchConfetti();
 
+        if ($("guessButton")) {
+            $("guessButton").disabled = true;
+        }
+
         return;
     }
 
-    if (guess < numberTarget) {
-        $("#guessMessage").textContent =
-            "📈 Too low! Try a bigger number.";
-    } else {
-        $("#guessMessage").textContent =
-            "📉 Too high! Try a smaller number.";
+    if (message) {
+        message.textContent =
+            guess < numberGame.target
+                ? "⬆️ Try a higher number."
+                : "⬇️ Try a lower number.";
     }
 
     playSound("click");
 }
 
-
 /* =========================================================
-   28. GAME BUTTONS
-   ========================================================= */
-
-function setupGames() {
-    $$("[data-game]").forEach(card => {
-        card.addEventListener(
-            "click",
-            () => {
-                openGame(
-                    card.dataset.game
-                );
-            }
-        );
-    });
-}
-
-
-/* =========================================================
-   29. LEADERBOARD
-   ========================================================= */
-
-function getLeaderboard(type = "daily") {
-    const users = [...data.users];
-
-    if (type === "weekly") {
-        return users.sort(
-            (a, b) => b.xp - a.xp
-        );
-    }
-
-    return users.sort(
-        (a, b) => b.xp - a.xp
-    );
-}
-
-function renderLeaderboard() {
-    const container =
-        $("#leaderboardList");
-
-    if (!container) return;
-
-    const type =
-        $(".leaderboard-tab.active")
-            ?.dataset.type ||
-        "daily";
-
-    const users =
-        getLeaderboard(type);
-
-    if (!users.length) {
-        container.innerHTML = `
-            <div class="empty-state">
-                No players yet.
-            </div>
-        `;
-
-        return;
-    }
-
-    container.innerHTML =
-        users.slice(0, 10)
-            .map((user, index) => `
-                <div class="leaderboard-row ${
-                    user.id === currentUserId
-                        ? "current-player"
-                        : ""
-                }">
-                    <div class="leaderboard-rank">
-                        ${
-                            index === 0
-                                ? "🥇"
-                                : index === 1
-                                ? "🥈"
-                                : index === 2
-                                ? "🥉"
-                                : `#${index + 1}`
-                        }
-                    </div>
-
-                    <div class="leaderboard-user">
-                        <div class="avatar">
-                            ${escapeHTML(user.avatar)}
-                        </div>
-
-                        <div>
-                            <strong>
-                                ${escapeHTML(user.name)}
-                            </strong>
-
-                            <small>
-                                Level ${user.level}
-                            </small>
-                        </div>
-                    </div>
-
-                    <div class="leaderboard-xp">
-                        ${user.xp} XP
-                    </div>
-                </div>
-            `)
-            .join("");
-}
-
-function setupLeaderboard() {
-    $$(".leaderboard-tab").forEach(tab => {
-        tab.addEventListener(
-            "click",
-            () => {
-                $$(".leaderboard-tab")
-                    .forEach(item =>
-                        item.classList.remove(
-                            "active"
-                        )
-                    );
-
-                tab.classList.add("active");
-
-                renderLeaderboard();
-            }
-        );
-    });
-}
-
-
-/* =========================================================
-   30. FRIEND ROOM
+   FRIEND ROOMS
    ========================================================= */
 
 function generateRoomCode() {
-    const chars =
-        "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     let code = "";
 
     for (let i = 0; i < 6; i++) {
-        code += chars[
-            Math.floor(
-                Math.random() *
-                chars.length
-            )
-        ];
+        code += chars[Math.floor(Math.random() * chars.length)];
     }
 
     return code;
 }
 
 function createRoom() {
-    const user = getCurrentUser();
+    const current = getCurrentUser();
 
-    if (!user) return;
+    if (!current) return;
 
-    const code = generateRoomCode();
+    let code;
 
-    data.rooms.push({
+    do {
+        code = generateRoomCode();
+    } while (db.rooms.some(room => room.code === code));
+
+    const room = {
+        id: makeId("room"),
         code,
-        host: user.id,
-        members: [user.id],
+        hostId: current.id,
+        members: [current.id],
         createdAt: Date.now()
-    });
+    };
 
-    saveData();
+    db.rooms.push(room);
 
-    const roomCode =
-        $("#roomCode");
+    saveDatabase();
 
-    if (roomCode) {
-        roomCode.textContent =
-            code;
-    }
+    renderRoom(room);
 
-    showToast(
-        `Room ${code} created!`,
-        "success"
-    );
-
-    addXP(10);
+    showToast(`Room created: ${code}`);
+    playSound("success");
 }
 
 function joinRoom() {
-    const user = getCurrentUser();
+    const current = getCurrentUser();
 
-    if (!user) return;
+    if (!current) return;
 
-    const input =
-        $("#joinRoomInput");
+    const input = $("joinRoomInput");
 
-    if (!input) return;
-
-    const code =
-        input.value.trim().toUpperCase();
+    const code = input?.value.trim().toUpperCase();
 
     if (!code) {
-        showToast(
-            "Enter a room code.",
-            "error"
-        );
+        showToast("Enter a room code.", "error");
         return;
     }
 
-    const room =
-        data.rooms.find(
-            item => item.code === code
-        );
+    const room = db.rooms.find(item => item.code === code);
 
     if (!room) {
-        showToast(
-            "Room not found.",
-            "error"
-        );
+        showToast("Room not found.", "error");
+        playSound("error");
         return;
     }
 
-    if (!room.members.includes(user.id)) {
-        room.members.push(user.id);
+    if (!room.members.includes(current.id)) {
+        room.members.push(current.id);
     }
 
-    saveData();
-
-    showToast(
-        `Joined room ${code}!`,
-        "success"
-    );
+    saveDatabase();
 
     input.value = "";
 
     renderRoom(room);
+
+    showToast("Joined the Friend Room!");
+    playSound("success");
 }
 
-function renderRoom(room = null) {
-    const codeElement =
-        $("#roomCode");
-
-    const membersElement =
-        $("#roomMembers");
-
-    if (!codeElement) return;
-
+function renderRoom(room) {
     if (!room) {
-        const user =
-            getCurrentUser();
+        if ($("roomCode")) {
+            $("roomCode").textContent = "------";
+        }
 
-        room =
-            data.rooms.find(
-                item =>
-                    item.host === user?.id &&
-                    item.members.includes(
-                        user?.id
-                    )
-            );
-    }
-
-    if (!room) {
-        codeElement.textContent =
-            "------";
-
-        if (membersElement) {
-            membersElement.innerHTML =
-                "No active room";
+        if ($("roomMembers")) {
+            $("roomMembers").innerHTML = "";
         }
 
         return;
     }
 
-    codeElement.textContent =
-        room.code;
+    if ($("roomCode")) {
+        $("roomCode").textContent = room.code;
+    }
 
-    if (membersElement) {
-        membersElement.innerHTML =
-            room.members
-                .map(id => {
-                    const member =
-                        getUserById(id);
+    if ($("roomMembers")) {
+        $("roomMembers").innerHTML = room.members
+            .map(id => {
+                const user = getUserById(id);
 
-                    return member
-                        ? `<span>${escapeHTML(member.name)}</span>`
-                        : "";
-                })
-                .join("");
+                return `
+                    <div class="room-member">
+                        ${escapeHTML(user?.name || "Unknown")}
+                    </div>
+                `;
+            })
+            .join("");
     }
 }
 
-function setupRoom() {
-    $("#createRoom")?.addEventListener(
-        "click",
-        createRoom
-    );
+/* =========================================================
+   THOUGHTS
+   ========================================================= */
 
-    $("#joinRoom")?.addEventListener(
-        "click",
-        joinRoom
-    );
+function setupThoughts() {
+    $("postThought")?.addEventListener("click", postThought);
 
-    $("#joinRoomInput")?.addEventListener(
-        "keydown",
-        event => {
-            if (event.key === "Enter") {
-                joinRoom();
-            }
+    $("thoughtInput")?.addEventListener("keydown", event => {
+        if (
+            event.key === "Enter" &&
+            (event.ctrlKey || event.metaKey)
+        ) {
+            event.preventDefault();
+            postThought();
         }
-    );
-
-    $("#copyRoomCode")?.addEventListener(
-        "click",
-        async () => {
-            const code =
-                $("#roomCode")?.textContent;
-
-            if (!code || code === "------") {
-                showToast(
-                    "Create a room first.",
-                    "error"
-                );
-                return;
-            }
-
-            await copyText(code);
-
-            showToast(
-                "Room code copied!",
-                "success"
-            );
-        }
-    );
+    });
 }
 
+function postThought() {
+    const current = getCurrentUser();
+
+    if (!current) return;
+
+    const input = $("thoughtInput");
+
+    const text = input?.value.trim();
+
+    if (!text) {
+        showToast("Write something first.", "error");
+        return;
+    }
+
+    if (text.length > 160) {
+        showToast("Thought must be 160 characters or less.", "error");
+        return;
+    }
+
+    db.activities.unshift({
+        id: makeId("thought"),
+        type: "thought",
+        userId: current.id,
+        text,
+        createdAt: Date.now()
+    });
+
+    current.thoughts = current.thoughts || [];
+    current.thoughts.unshift(text);
+
+    if (current.thoughts.length > 20) {
+        current.thoughts.length = 20;
+    }
+
+    saveDatabase();
+
+    input.value = "";
+
+    renderThoughts();
+
+    showToast("Thought posted!");
+    playSound("success");
+}
+
+function renderThoughts() {
+    const list = $("thoughtsList");
+
+    if (!list) return;
+
+    const thoughts = db.activities
+        .filter(item => item.type === "thought")
+        .slice(0, 20);
+
+    if (!thoughts.length) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">💭</div>
+                <h3>No thoughts yet</h3>
+                <p>Be the first person to share something.</p>
+            </div>
+        `;
+
+        return;
+    }
+
+    list.innerHTML = thoughts
+        .map(thought => {
+            const user = getUserById(thought.userId);
+
+            if (!user) return "";
+
+            return `
+                <div class="thought-item">
+                    <div class="thought-avatar">
+                        ${
+                            user.avatar
+                                ? `<img src="${escapeHTML(user.avatar)}" alt="">`
+                                : escapeHTML(getInitials(user.name))
+                        }
+                    </div>
+
+                    <div class="thought-content">
+                        <div class="thought-header">
+                            <span class="thought-name">
+                                ${escapeHTML(user.name)}
+                            </span>
+
+                            <span class="thought-time">
+                                ${escapeHTML(formatTime(thought.createdAt))}
+                            </span>
+                        </div>
+
+                        <div class="thought-text">
+                            ${escapeHTML(thought.text)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        })
+        .join("");
+}
 
 /* =========================================================
-   31. PROFILE
+   LEADERBOARD
+   ========================================================= */
+
+function setupLeaderboard() {
+    $all(".leaderboard-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+            currentLeaderboardType = tab.dataset.type || "daily";
+
+            $all(".leaderboard-tab").forEach(item => {
+                item.classList.remove("active");
+            });
+
+            tab.classList.add("active");
+
+            renderLeaderboard();
+
+            playSound("click");
+        });
+    });
+}
+
+function renderLeaderboard() {
+    const list = $("leaderboardList");
+
+    if (!list) return;
+
+    db.users.forEach(refreshXPPeriods);
+
+    const users = [...db.users];
+
+    users.sort((a, b) => {
+        let aXP = a.xp;
+        let bXP = b.xp;
+
+        if (currentLeaderboardType === "daily") {
+            aXP = a.xpDaily || 0;
+            bXP = b.xpDaily || 0;
+        }
+
+        if (currentLeaderboardType === "weekly") {
+            aXP = a.xpWeekly || 0;
+            bXP = b.xpWeekly || 0;
+        }
+
+        return bXP - aXP;
+    });
+
+    if (!users.length) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🏆</div>
+                <h3>No players yet</h3>
+                <p>Create an account to enter the leaderboard.</p>
+            </div>
+        `;
+
+        return;
+    }
+
+    list.innerHTML = users
+        .slice(0, 20)
+        .map((user, index) => {
+            let xp = user.xp;
+
+            if (currentLeaderboardType === "daily") {
+                xp = user.xpDaily || 0;
+            }
+
+            if (currentLeaderboardType === "weekly") {
+                xp = user.xpWeekly || 0;
+            }
+
+            const isMe = user.id === currentUserId;
+
+            return `
+                <div class="leaderboard-item">
+                    <div class="leaderboard-rank">
+                        #${index + 1}
+                    </div>
+
+                    <div class="friend-avatar" style="width:38px;height:38px;flex-basis:38px;">
+                        ${
+                            user.avatar
+                                ? `<img src="${escapeHTML(user.avatar)}" alt="">`
+                                : escapeHTML(getInitials(user.name))
+                        }
+                    </div>
+
+                    <div class="leaderboard-user">
+                        <strong>
+                            ${escapeHTML(user.name)}
+                            ${isMe ? " • You" : ""}
+                        </strong>
+
+                        <span>
+                            Level ${user.level}
+                        </span>
+                    </div>
+
+                    <div class="leaderboard-xp">
+                        ${xp} XP
+                    </div>
+                </div>
+            `;
+        })
+        .join("");
+
+    saveDatabase();
+}
+
+/* =========================================================
+   PROFILE
    ========================================================= */
 
 function renderProfile() {
@@ -2907,111 +2110,360 @@ function renderProfile() {
 
     if (!user) return;
 
-    setText(
-        "#profileName",
-        user.name
-    );
+    const avatar = $("profileAvatar");
 
-    setText(
-        "#profileEmail",
-        user.email
-    );
-
-    setText(
-        "#profileFriendId",
-        user.friendId
-    );
-
-    setText(
-        "#profileLevel",
-        user.level
-    );
-
-    setText(
-        "#profileXP",
-        user.xp
-    );
-
-    setText(
-        "#profileStreak",
-        user.streak
-    );
-
-    setText(
-        "#profileFriends",
-        user.friends.length
-    );
-
-    setText(
-        "#profileGames",
-        user.gamesPlayed
-    );
-}
-
-function setText(selector, value) {
-    const element =
-        $(selector);
-
-    if (element) {
-        element.textContent =
-            value ?? "";
+    if (avatar) {
+        avatar.innerHTML = user.avatar
+            ? `<img src="${escapeHTML(user.avatar)}" alt="Profile avatar">`
+            : escapeHTML(getInitials(user.name));
     }
-}
 
-async function copyText(text) {
-    try {
-        await navigator.clipboard.writeText(
-            text
-        );
-    } catch {
-        const textarea =
-            document.createElement("textarea");
+    if ($("profileName")) {
+        $("profileName").textContent = user.name;
+    }
 
-        textarea.value = text;
+    if ($("profileEmail")) {
+        $("profileEmail").textContent = user.email;
+    }
 
-        document.body.appendChild(
-            textarea
-        );
+    if ($("profileFriendId")) {
+        $("profileFriendId").textContent = user.friendId;
+    }
 
-        textarea.select();
+    if ($("profileLevel")) {
+        $("profileLevel").textContent = user.level;
+    }
 
-        document.execCommand("copy");
+    if ($("profileXP")) {
+        $("profileXP").textContent = user.xp;
+    }
 
-        textarea.remove();
+    if ($("profileFriends")) {
+        $("profileFriends").textContent = user.friends.length;
+    }
+
+    if ($("profileGames")) {
+        $("profileGames").textContent = user.gamesPlayed;
+    }
+
+    if ($("profileStreak")) {
+        $("profileStreak").textContent = user.streak;
+    }
+
+    if ($("currentUserThoughtAvatar")) {
+        $("currentUserThoughtAvatar").innerHTML =
+            user.avatar
+                ? `<img src="${escapeHTML(user.avatar)}" alt="">`
+                : escapeHTML(getInitials(user.name));
     }
 }
 
 function setupProfile() {
-    $("#copyFriendId")?.addEventListener(
-        "click",
-        async () => {
-            const user =
-                getCurrentUser();
+    $("logoutButton")?.addEventListener("click", logout);
 
-            if (!user) return;
+    $("copyFriendId")?.addEventListener("click", () => {
+        const user = getCurrentUser();
 
-            await copyText(
-                user.friendId
-            );
-
-            showToast(
-                "Friend ID copied!",
-                "success"
-            );
-
-            playSound("success");
+        if (user) {
+            copyText(user.friendId);
         }
-    );
-
-    $("#logoutButton")?.addEventListener(
-        "click",
-        logout
-    );
+    });
 }
 
+/* =========================================================
+   RENDER FRIENDS
+   ========================================================= */
+
+function renderFriends() {
+    const current = getCurrentUser();
+
+    if (!current) return;
+
+    if ($("myFriendsCount")) {
+        $("myFriendsCount").textContent =
+            current.friends.length;
+    }
+
+    const friendsList = $("friendsList");
+    const bestList = $("bestFriendsList");
+    const requestsList = $("friendRequestsList");
+
+    if (requestsList) {
+        const requests = db.friendRequests.filter(
+            request =>
+                request.toId === current.id &&
+                request.status === "pending"
+        );
+
+        if (!requests.length) {
+            requestsList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📨</div>
+                    <h3>No pending requests</h3>
+                    <p>New friend requests will appear here.</p>
+                </div>
+            `;
+        } else {
+            requestsList.innerHTML = requests
+                .map(request => {
+                    const user = getUserById(request.fromId);
+
+                    if (!user) return "";
+
+                    return `
+                        <div class="friend-request">
+                            <div class="friend-avatar">
+                                ${
+                                    user.avatar
+                                        ? `<img src="${escapeHTML(user.avatar)}" alt="">`
+                                        : escapeHTML(getInitials(user.name))
+                                }
+                            </div>
+
+                            <div class="friend-user-info">
+                                <div class="friend-user-name">
+                                    ${escapeHTML(user.name)}
+                                </div>
+
+                                <div class="friend-user-id">
+                                    ${escapeHTML(user.friendId)}
+                                </div>
+                            </div>
+
+                            <div class="friend-actions">
+                                <button
+                                    class="btn btn-success btn-small"
+                                    data-action="accept-friend"
+                                    data-id="${request.id}"
+                                    type="button"
+                                >
+                                    Accept
+                                </button>
+
+                                <button
+                                    class="btn btn-danger btn-small"
+                                    data-action="reject-friend"
+                                    data-id="${request.id}"
+                                    type="button"
+                                >
+                                    Reject
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                })
+                .join("");
+        }
+    }
+
+    if (friendsList) {
+        if (!current.friends.length) {
+            friendsList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">👥</div>
+                    <h3>You have 0 friends</h3>
+                    <p>
+                        FriendZone starts with zero friends.
+                        Use a Friend ID to connect with someone.
+                    </p>
+                </div>
+            `;
+        } else {
+            friendsList.innerHTML = current.friends
+                .map(id => {
+                    const friend = getUserById(id);
+
+                    if (!friend) return "";
+
+                    const isBest =
+                        current.bestFriends.includes(friend.id);
+
+                    return `
+                        <div class="friend-card">
+                            <div class="friend-avatar">
+                                ${
+                                    friend.avatar
+                                        ? `<img src="${escapeHTML(friend.avatar)}" alt="">`
+                                        : escapeHTML(getInitials(friend.name))
+                                }
+                            </div>
+
+                            <div class="friend-details">
+                                <h3>
+                                    ${escapeHTML(friend.name)}
+                                </h3>
+
+                                <p>
+                                    ${escapeHTML(friend.friendId)}
+                                </p>
+
+                                ${
+                                    isBest
+                                        ? `
+                                        <div class="best-friend-badge">
+                                            💖 Best Friend
+                                        </div>
+                                        `
+                                        : ""
+                                }
+                            </div>
+
+                            <div class="friend-card-actions">
+                                <button
+                                    class="btn btn-secondary btn-small"
+                                    data-action="friend-details"
+                                    data-id="${friend.id}"
+                                    type="button"
+                                >
+                                    View
+                                </button>
+
+                                <button
+                                    class="btn btn-secondary btn-small"
+                                    data-action="best-friend"
+                                    data-id="${friend.id}"
+                                    type="button"
+                                >
+                                    ${isBest ? "💖" : "♡"}
+                                </button>
+
+                                <button
+                                    class="btn btn-danger btn-small"
+                                    data-action="remove-friend"
+                                    data-id="${friend.id}"
+                                    type="button"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                })
+                .join("");
+        }
+    }
+
+    if (bestList) {
+        const bestFriends = current.bestFriends
+            .map(id => getUserById(id))
+            .filter(Boolean);
+
+        if (!bestFriends.length) {
+            bestList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">💖</div>
+                    <h3>No Best Friends yet</h3>
+                    <p>
+                        Best Friends is optional. Add friends here
+                        when someone becomes special to you.
+                    </p>
+                </div>
+            `;
+        } else {
+            bestList.innerHTML = bestFriends
+                .map(friend => {
+                    return `
+                        <div class="friend-card best-friend-card">
+                            <div class="friend-avatar">
+                                ${
+                                    friend.avatar
+                                        ? `<img src="${escapeHTML(friend.avatar)}" alt="">`
+                                        : escapeHTML(getInitials(friend.name))
+                                }
+                            </div>
+
+                            <div class="friend-details">
+                                <h3>${escapeHTML(friend.name)}</h3>
+
+                                <p>${escapeHTML(friend.friendId)}</p>
+
+                                <div class="best-friend-badge">
+                                    💖 Best Friend
+                                </div>
+                            </div>
+
+                            <button
+                                class="btn btn-secondary btn-small"
+                                data-action="friend-details"
+                                data-id="${friend.id}"
+                                type="button"
+                            >
+                                View
+                            </button>
+                        </div>
+                    `;
+                })
+                .join("");
+        }
+    }
+
+    updateFriendRequestBadge();
+}
 
 /* =========================================================
-   32. HOME STATS
+   FRIEND EVENTS
+   ========================================================= */
+
+function setupFriendDelegation() {
+    document.addEventListener("click", event => {
+        const button = event.target.closest("[data-action]");
+
+        if (!button) return;
+
+        const action = button.dataset.action;
+        const id = button.dataset.id;
+
+        if (!action || !id) return;
+
+        if (action === "accept-friend") {
+            acceptFriendRequest(id);
+        }
+
+        if (action === "reject-friend") {
+            rejectFriendRequest(id);
+        }
+
+        if (action === "friend-details") {
+            openFriendDetails(id);
+        }
+
+        if (action === "best-friend") {
+            toggleBestFriend(id);
+        }
+
+        if (action === "remove-friend") {
+            removeFriend(id);
+        }
+    });
+}
+
+/* =========================================================
+   REQUEST BADGE
+   ========================================================= */
+
+function updateFriendRequestBadge() {
+    const current = getCurrentUser();
+
+    const badge = $("friendRequestBadge");
+
+    if (!current || !badge) return;
+
+    const count = db.friendRequests.filter(
+        request =>
+            request.toId === current.id &&
+            request.status === "pending"
+    ).length;
+
+    if (count > 0) {
+        badge.textContent = count > 99 ? "99+" : count;
+        badge.classList.remove("hidden");
+    } else {
+        badge.classList.add("hidden");
+    }
+}
+
+/* =========================================================
+   HOME
    ========================================================= */
 
 function renderHome() {
@@ -3019,601 +2471,262 @@ function renderHome() {
 
     if (!user) return;
 
-    setText(
-        "#welcomeName",
-        user.name
-    );
-
-    setText(
-        "#friendCount",
-        user.friends.length
-    );
-
-    setText(
-        "#bestFriendCount",
-        user.bestFriends.length
-    );
-
-    setText(
-        "#xpCount",
-        user.xp
-    );
-
-    setText(
-        "#streakCount",
-        user.streak
-    );
-
-    renderThoughts();
-    renderAchievements();
-}
-
-function renderThoughts() {
-    const container =
-        $("#thoughtsList");
-
-    if (!container) return;
-
-    const allThoughts = [];
-
-    data.users.forEach(user => {
-        if (!user.thoughts) return;
-
-        user.thoughts.forEach(
-            thought => {
-                allThoughts.push({
-                    ...thought,
-                    user
-                });
-            }
-        );
-    });
-
-    allThoughts.sort(
-        (a, b) =>
-            b.createdAt -
-            a.createdAt
-    );
-
-    if (!allThoughts.length) {
-        container.innerHTML = `
-            <div class="empty-state">
-                💭 No thoughts yet. Be the first!
-            </div>
-        `;
-
-        return;
+    if ($("friendCount")) {
+        $("friendCount").textContent = user.friends.length;
     }
 
-    container.innerHTML =
-        allThoughts
-            .slice(0, 8)
-            .map(item => `
-                <div class="thought-card">
-                    <div class="thought-avatar">
-                        ${escapeHTML(item.user.avatar)}
-                    </div>
+    if ($("bestFriendCount")) {
+        $("bestFriendCount").textContent =
+            user.bestFriends.length;
+    }
 
-                    <div class="thought-content">
-                        <strong>
-                            ${escapeHTML(item.user.name)}
-                        </strong>
+    if ($("xpCount")) {
+        $("xpCount").textContent = user.xp;
+    }
 
-                        <p>
-                            ${escapeHTML(item.text)}
-                        </p>
-
-                        <small>
-                            ${timeAgo(item.createdAt)}
-                        </small>
-                    </div>
-                </div>
-            `)
-            .join("");
+    if ($("streakCount")) {
+        $("streakCount").textContent = user.streak;
+    }
 }
+
+/* =========================================================
+   ACHIEVEMENT RENDER
+   ========================================================= */
 
 function renderAchievements() {
-    const container =
-        $("#achievementsList");
-
-    if (!container) return;
-
+    const list = $("achievementsList");
     const user = getCurrentUser();
 
-    if (!user) return;
+    if (!list || !user) return;
 
-    container.innerHTML =
-        ACHIEVEMENTS
-            .map(achievement => {
-                const unlocked =
-                    user.achievements.includes(
-                        achievement.id
-                    );
+    checkAchievements(user);
 
-                return `
-                    <div class="achievement-card ${
-                        unlocked
-                            ? "unlocked"
-                            : "locked"
-                    }">
+    const unlocked = user.achievements || [];
 
-                        <div class="achievement-icon">
-                            ${achievement.icon}
-                        </div>
-
-                        <div>
-                            <strong>
-                                ${escapeHTML(
-                                    achievement.title
-                                )}
-                            </strong>
-
-                            <p>
-                                ${escapeHTML(
-                                    achievement.description
-                                )}
-                            </p>
-                        </div>
-
-                    </div>
-                `;
-            })
-            .join("");
-}
-
-function timeAgo(timestamp) {
-    const seconds =
-        Math.floor(
-            (Date.now() - timestamp) /
-            1000
-        );
-
-    if (seconds < 60) {
-        return "just now";
-    }
-
-    const minutes =
-        Math.floor(seconds / 60);
-
-    if (minutes < 60) {
-        return `${minutes}m ago`;
-    }
-
-    const hours =
-        Math.floor(minutes / 60);
-
-    if (hours < 24) {
-        return `${hours}h ago`;
-    }
-
-    const days =
-        Math.floor(hours / 24);
-
-    return `${days}d ago`;
-}
-
-
-/* =========================================================
-   33. FRIENDS PAGE
-   ========================================================= */
-
-function renderFriends() {
-    const user = getCurrentUser();
-
-    if (!user) return;
-
-    renderMyFriends(user);
-    renderFriendRequests(user);
-    renderBestFriends(user);
-}
-
-function renderMyFriends(user) {
-    const container =
-        $("#friendsList");
-
-    if (!container) return;
-
-    if (!user.friends.length) {
-        container.innerHTML = `
+    if (!unlocked.length) {
+        list.innerHTML = `
             <div class="empty-state">
-                <div class="empty-icon">👥</div>
-
-                <h3>No Friends Yet</h3>
-
-                <p>
-                    Start by sending a Friend ID request.
-                </p>
+                <div class="empty-state-icon">🏅</div>
+                <h3>No achievements yet</h3>
+                <p>Play games and make friends to unlock achievements.</p>
             </div>
         `;
 
         return;
     }
 
-    container.innerHTML =
-        user.friends
-            .map(friendId => {
-                const friend =
-                    getUserById(friendId);
+    list.innerHTML = unlocked
+        .map(key => {
+            const achievement = ACHIEVEMENTS[key];
 
-                if (!friend) return "";
+            if (!achievement) return "";
 
-                return `
-                    <div class="friend-card">
-
-                        <div class="friend-avatar">
-                            ${escapeHTML(friend.avatar)}
-                        </div>
-
-                        <div class="friend-info">
-                            <strong>
-                                ${escapeHTML(friend.name)}
-                            </strong>
-
-                            <span>
-                                ${escapeHTML(friend.friendId)}
-                            </span>
-
-                            <small>
-                                Level ${friend.level}
-                            </small>
-                        </div>
-
-                        <div class="friend-actions">
-
-                            <button
-                                class="btn btn-small"
-                                data-best-friend="${friend.id}"
-                            >
-                                ${
-                                    isBestFriend(
-                                        user,
-                                        friend.id
-                                    )
-                                        ? "⭐ Best"
-                                        : "☆ Best"
-                                }
-                            </button>
-
-                            <button
-                                class="btn btn-small btn-danger"
-                                data-remove-friend="${friend.id}"
-                            >
-                                Remove
-                            </button>
-
-                        </div>
-
+            return `
+                <div class="achievement-item">
+                    <div class="achievement-icon">
+                        ${achievement.icon}
                     </div>
-                `;
-            })
-            .join("");
-}
 
-function renderFriendRequests(user) {
-    const container =
-        $("#friendRequestsList");
-
-    if (!container) return;
-
-    const requests =
-        data.friendRequests.filter(
-            request =>
-                request.to === user.id &&
-                request.status === "pending"
-        );
-
-    if (!requests.length) {
-        container.innerHTML = `
-            <div class="empty-state">
-                📭 No pending friend requests.
-            </div>
-        `;
-
-        return;
-    }
-
-    container.innerHTML =
-        requests
-            .map(request => {
-                const sender =
-                    getUserById(
-                        request.from
-                    );
-
-                if (!sender) return "";
-
-                return `
-                    <div class="request-card">
-
-                        <div class="friend-avatar">
-                            ${escapeHTML(sender.avatar)}
-                        </div>
-
-                        <div class="friend-info">
-                            <strong>
-                                ${escapeHTML(sender.name)}
-                            </strong>
-
-                            <span>
-                                ${escapeHTML(sender.friendId)}
-                            </span>
-                        </div>
-
-                        <div class="request-actions">
-
-                            <button
-                                class="btn btn-primary btn-small"
-                                data-accept-request="${request.id}"
-                            >
-                                Accept
-                            </button>
-
-                            <button
-                                class="btn btn-danger btn-small"
-                                data-reject-request="${request.id}"
-                            >
-                                Reject
-                            </button>
-
-                        </div>
-
+                    <div class="achievement-info">
+                        <h4>${escapeHTML(achievement.title)}</h4>
+                        <p>${escapeHTML(achievement.description)}</p>
                     </div>
-                `;
-            })
-            .join("");
+                </div>
+            `;
+        })
+        .join("");
 }
-
-function renderBestFriends(user) {
-    const container =
-        $("#bestFriendsList");
-
-    if (!container) return;
-
-    if (!user.bestFriends.length) {
-        container.innerHTML = `
-            <div class="empty-state">
-                ⭐ Your Best Friends circle is empty.
-            </div>
-        `;
-
-        return;
-    }
-
-    container.innerHTML =
-        user.bestFriends
-            .map(friendId => {
-                const friend =
-                    getUserById(friendId);
-
-                if (!friend) return "";
-
-                return `
-                    <div class="best-friend-card">
-
-                        <div class="best-friend-star">
-                            ⭐
-                        </div>
-
-                        <div class="friend-avatar">
-                            ${escapeHTML(friend.avatar)}
-                        </div>
-
-                        <div class="friend-info">
-                            <strong>
-                                ${escapeHTML(friend.name)}
-                            </strong>
-
-                            <span>
-                                ${escapeHTML(friend.friendId)}
-                            </span>
-                        </div>
-
-                        <button
-                            class="btn btn-small"
-                            data-best-friend="${friend.id}"
-                        >
-                            Remove
-                        </button>
-
-                    </div>
-                `;
-            })
-            .join("");
-}
-
 
 /* =========================================================
-   34. THOUGHT INPUT
+   MODALS
    ========================================================= */
 
-function setupThoughts() {
-    $("#postThought")?.addEventListener(
-        "click",
-        addThought
-    );
+function openModal(title, body) {
+    const modal = $("generalModal");
 
-    $("#thoughtInput")?.addEventListener(
-        "keydown",
-        event => {
-            if (
-                event.key === "Enter" &&
-                !event.shiftKey
-            ) {
-                event.preventDefault();
+    if (!modal) return;
 
-                addThought();
-            }
-        }
-    );
+    const titleElement = modal.querySelector(".modal-title");
+    const bodyElement = modal.querySelector(".modal-body");
+
+    if (titleElement) {
+        titleElement.textContent = title;
+    }
+
+    if (bodyElement) {
+        bodyElement.innerHTML = body;
+    }
+
+    modal.classList.remove("hidden");
+    modal.classList.add("active");
+
+    document.body.classList.add("no-scroll");
 }
 
+function openGameModal(title, body) {
+    const modal = $("gameModal");
 
-/* =========================================================
-   35. COPY / GENERAL BUTTONS
-   ========================================================= */
+    if (!modal) return;
 
-function setupGeneralButtons() {
-    $$("[data-close-modal]").forEach(
-        button => {
-            button.addEventListener(
-                "click",
-                () => {
-                    closeModal(
-                        button.closest(".modal")
-                    );
-                }
-            );
-        }
-    );
+    const titleElement =
+        modal.querySelector(".game-modal-title");
 
-    $$(".modal").forEach(modal => {
-        modal.addEventListener(
-            "click",
-            event => {
-                if (
-                    event.target === modal
-                ) {
-                    closeModal(modal);
-                }
-            }
-        );
+    const bodyElement =
+        modal.querySelector(".game-modal-body");
+
+    if (titleElement) {
+        titleElement.textContent = title;
+    }
+
+    if (bodyElement) {
+        bodyElement.innerHTML = body;
+    }
+
+    modal.classList.remove("hidden");
+    modal.classList.add("active");
+
+    document.body.classList.add("no-scroll");
+}
+
+function closeModal() {
+    const modals = [$("generalModal"), $("gameModal")];
+
+    modals.forEach(modal => {
+        if (!modal) return;
+
+        modal.classList.remove("active");
+        modal.classList.add("hidden");
     });
 
-    document.addEventListener(
-        "keydown",
-        event => {
-            if (event.key === "Escape") {
-                $$(".modal.active").forEach(
-                    modal =>
-                        closeModal(modal)
-                );
-            }
-        }
-    );
+    document.body.classList.remove("no-scroll");
+
+    if (tapGame?.timer) {
+        clearInterval(tapGame.timer);
+    }
+
+    tapGame = null;
+    memoryGame = null;
+    numberGame = null;
 }
 
+function setupModals() {
+    $all("[data-close-modal]").forEach(button => {
+        button.addEventListener("click", event => {
+            event.preventDefault();
+            closeModal();
+        });
+    });
+
+    $all(".modal-overlay").forEach(overlay => {
+        overlay.addEventListener("click", closeModal);
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            closeModal();
+        }
+    });
+}
 
 /* =========================================================
-   36. CONFETTI
+   COPY
+   ========================================================= */
+
+async function copyText(text) {
+    if (!text) return;
+
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast("Copied to clipboard!");
+        playSound("success");
+    } catch (error) {
+        const temporary = document.createElement("textarea");
+
+        temporary.value = text;
+        temporary.style.position = "fixed";
+        temporary.style.opacity = "0";
+
+        document.body.appendChild(temporary);
+
+        temporary.select();
+
+        try {
+            document.execCommand("copy");
+            showToast("Copied to clipboard!");
+        } catch {
+            showToast("Could not copy automatically.", "error");
+        }
+
+        temporary.remove();
+    }
+}
+
+/* =========================================================
+   CONFETTI
    ========================================================= */
 
 function launchConfetti() {
-    const container =
-        document.createElement("div");
+    const container = document.createElement("div");
 
-    container.className =
-        "confetti-container";
+    container.className = "confetti-container";
 
-    document.body.appendChild(
-        container
-    );
+    const symbols = ["●", "◆", "★", "■", "✦"];
 
-    const symbols = [
-        "✨",
-        "🎉",
-        "⭐",
-        "💜",
-        "🔥",
-        "⚡"
-    ];
+    for (let i = 0; i < 70; i++) {
+        const piece = document.createElement("div");
 
-    for (let i = 0; i < 35; i++) {
-        const piece =
-            document.createElement("span");
-
-        piece.className =
-            "confetti-piece";
+        piece.className = "confetti-piece";
 
         piece.textContent =
-            symbols[
-                Math.floor(
-                    Math.random() *
-                    symbols.length
-                )
-            ];
+            symbols[Math.floor(Math.random() * symbols.length)];
 
         piece.style.left =
-            `${Math.random() * 100}%`;
+            Math.random() * 100 + "%";
+
+        piece.style.setProperty(
+            "--x",
+            `${(Math.random() - 0.5) * 300}px`
+        );
 
         piece.style.animationDelay =
-            `${Math.random() * 0.7}s`;
+            Math.random() * 0.35 + "s";
 
         piece.style.fontSize =
-            `${12 + Math.random() * 16}px`;
+            `${7 + Math.random() * 9}px`;
 
-        container.appendChild(
-            piece
-        );
+        piece.style.color = [
+            "#7c5cff",
+            "#25d9ff",
+            "#ff4fd8",
+            "#3ee88b",
+            "#ffd45a"
+        ][Math.floor(Math.random() * 5)];
+
+        container.appendChild(piece);
     }
+
+    document.body.appendChild(container);
 
     setTimeout(() => {
         container.remove();
-    }, 2500);
+    }, 3500);
 }
 
-
 /* =========================================================
-   37. ADDITIONAL CONFETTI CSS
+   ESCAPE HTML
    ========================================================= */
 
-function injectConfettiCSS() {
-    if ($("#friendzoneConfettiCSS")) {
-        return;
-    }
-
-    const style =
-        document.createElement("style");
-
-    style.id =
-        "friendzoneConfettiCSS";
-
-    style.textContent = `
-        .confetti-container {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 99999;
-            overflow: hidden;
-        }
-
-        .confetti-piece {
-            position: absolute;
-            top: -40px;
-            animation:
-                friendzoneConfettiFall
-                2.2s ease-out
-                forwards;
-        }
-
-        @keyframes friendzoneConfettiFall {
-            0% {
-                transform:
-                    translateY(0)
-                    rotate(0deg);
-                opacity: 1;
-            }
-
-            100% {
-                transform:
-                    translateY(110vh)
-                    rotate(720deg);
-                opacity: 0;
-            }
-        }
-
-        body.modal-open {
-            overflow: hidden;
-        }
-    `;
-
-    document.head.appendChild(
-        style
-    );
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
-
 /* =========================================================
-   38. GLOBAL RENDER
+   RENDER EVERYTHING
    ========================================================= */
 
 function renderEverything() {
@@ -3621,92 +2734,98 @@ function renderEverything() {
 
     if (!user) return;
 
-    checkAchievements();
+    refreshXPPeriods(user);
+    updateStreak(user);
 
     renderHome();
     renderFriends();
+    renderThoughts();
+    renderAchievements();
     renderLeaderboard();
     renderProfile();
-    renderRoom();
 
-    updateNavBadges();
+    updateFriendRequestBadge();
+    updateSoundButton();
+
+    saveDatabase();
 }
-
-function updateNavBadges() {
-    const user = getCurrentUser();
-
-    if (!user) return;
-
-    const requestCount =
-        data.friendRequests.filter(
-            request =>
-                request.to === user.id &&
-                request.status === "pending"
-        ).length;
-
-    const badge =
-        $("#friendRequestBadge");
-
-    if (badge) {
-        badge.textContent =
-            requestCount;
-
-        badge.classList.toggle(
-            "hidden",
-            requestCount === 0
-        );
-    }
-}
-
 
 /* =========================================================
-   39. STARTUP
+   GENERAL EVENT SETUP
    ========================================================= */
 
-function initializeFriendZone() {
-    injectConfettiCSS();
+function setupGeneralEvents() {
+    $("themeButton")?.addEventListener(
+        "click",
+        toggleTheme
+    );
+
+    $("soundButton")?.addEventListener("click", () => {
+        const enabled = soundEnabled();
+
+        localStorage.setItem(
+            SOUND_KEY,
+            enabled ? "off" : "on"
+        );
+
+        updateSoundButton();
+
+        playSound("click");
+    });
+
+    document.addEventListener("click", event => {
+        const button = event.target.closest("button");
+
+        if (!button) return;
+
+        if (
+            button.id !== "soundButton" &&
+            button.id !== "themeButton"
+        ) {
+            if (
+                !button.closest(".modal") ||
+                button.classList.contains("game-action-button") ||
+                button.classList.contains("btn")
+            ) {
+                playSound("click");
+            }
+        }
+    });
+}
+
+/* =========================================================
+   STARTUP
+   ========================================================= */
+
+function initialize() {
+    setupTheme();
+    updateSoundButton();
 
     setupAuthentication();
     setupNavigation();
-    setupMobileNavigation();
-
-    setupTheme();
-    setupSound();
-
     setupFriendSystem();
-    setupGames();
-    setupLeaderboard();
-
-    setupRoom();
-    setupProfile();
-
+    setupFriendDelegation();
     setupThoughts();
-    setupGeneralButtons();
+    setupLeaderboard();
+    setupGames();
+    setupModals();
+    setupProfile();
+    setupGeneralEvents();
 
-    const user =
-        getCurrentUser();
+    const current = getCurrentUser();
 
-    if (user) {
-        updateStreak(user);
+    if (current) {
+        updateStreak(current);
+        saveDatabase();
         showApp();
     } else {
-        showAuth();
+        hide($("appShell"));
+        show($("authScreen"));
     }
 }
 
-
 /* =========================================================
-   40. DOM READY
+   RUN
    ========================================================= */
 
-if (
-    document.readyState ===
-    "loading"
-) {
-    document.addEventListener(
-        "DOMContentLoaded",
-        initializeFriendZone
-    );
-} else {
-    initializeFriendZone();
-}
+document.addEventListener("DOMContentLoaded", initialize);
