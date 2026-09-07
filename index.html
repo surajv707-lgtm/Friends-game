@@ -2303,27 +2303,31 @@
     aria-atomic="true"
   ></div>
 
+<!-- =========================================================
+     SUPABASE
+========================================================== -->
 
-  <!-- =========================================================
-       SUPABASE
-  ========================================================== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <script>
+<script>
   const SUPABASE_URL = "https://hjdevuoxuoyenzmawwnb.supabase.co";
 
-  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY";
+  /*
+   * IMPORTANT:
+   * Replace the value below with the REAL
+   * Publishable/Anon key from your Supabase project.
+   */
+  const SUPABASE_ANON_KEY = "PASTE_YOUR_REAL_SUPABASE_PUBLISHABLE_KEY_HERE";
 
   window.FRIENDZONE_CONFIG = {
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
+    SUPABASE_URL: SUPABASE_URL,
+    SUPABASE_ANON_KEY: SUPABASE_ANON_KEY
   };
 </script>
 
-
-
-
-  <!-- Main JavaScript -->
-  <script src="script.js"></script>
+<!-- Main JavaScript -->
+<script src="script.js"></script>
+  
 
 </body>
 </html>
