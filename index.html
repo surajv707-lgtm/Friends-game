@@ -2308,21 +2308,18 @@
        SUPABASE
   ========================================================== -->
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-
-  <!-- =========================================================
-       FRIENDZONE CONFIG
-  ========================================================== -->
-
   <script>
-    window.FRIENDZONE_CONFIG = {
-      SUPABASE_URL: "https://hjdevuoxuoyenzmawwnb.supabase.co",
+  const SUPABASE_URL = "https://hjdevuoxuoyenzmawwnb.supabase.co";
 
-      SUPABASE_ANON_KEY:
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjZGV2dW94dW95ZW56bWF3d25iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODgzNjYsImV4cCI6MjEwNDM2NDM2Nn0.-ER4x0hqUYss521B_FWAHnfWjtxg9YJIaWNXjQJPPhI"
-    };
-  </script>
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY";
+
+  window.FRIENDZONE_CONFIG = {
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  };
+</script>
+
+
 
 
   <!-- Main JavaScript -->
