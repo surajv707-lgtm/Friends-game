@@ -1,1306 +1,868 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#07080d">
+  <title>FriendZone — Play. Connect. Compete.</title>
 
-    <meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>FriendZone 🎮</title>
-
-    <meta
-        name="description"
-        content="FriendZone - Play, connect and have fun with your friends."
-    >
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-
-    <link
-        rel="preconnect"
-        href="https://fonts.gstatic.com"
-        crossorigin
-    >
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
-        rel="stylesheet"
-    >
-
-    <link rel="stylesheet" href="style.css">
-
+  <link rel="stylesheet" href="style.css">
 </head>
-
 
 <body>
 
+<div class="bg-orb orb-a"></div>
+<div class="bg-orb orb-b"></div>
 
-<!-- =========================================
-     BACKGROUND
-========================================= -->
+<div id="toast"></div>
 
-<div class="background-effects">
+<!-- ================= AUTH ================= -->
 
-    <div class="glow glow-1"></div>
-    <div class="glow glow-2"></div>
-    <div class="glow glow-3"></div>
+<section id="auth" class="auth">
 
-</div>
+  <div class="auth-card glass">
 
-
-
-<!-- =========================================
-     AUTHENTICATION
-========================================= -->
-
-<section id="authScreen" class="auth-screen">
-
-    <div class="auth-box">
-
-        <div class="auth-logo">
-            🎮
-        </div>
-
-        <h1 class="auth-logo-text">
-            Friend<span>Zone</span>
-        </h1>
-
-        <p class="auth-tagline">
-            Play. Connect. Create memories.
-        </p>
-
-
-        <!-- =====================================
-             SIGN UP
-        ====================================== -->
-
-        <div id="signupForm" class="auth-form">
-
-            <div class="auth-heading">
-
-                <h2>
-                    Create Account
-                </h2>
-
-                <p>
-                    Join FriendZone and meet your squad.
-                </p>
-
-            </div>
-
-
-            <label>
-                Your Name
-            </label>
-
-            <input
-                type="text"
-                id="signupName"
-                placeholder="Enter your name"
-                maxlength="30"
-                autocomplete="name"
-            >
-
-
-            <label>
-                Email
-            </label>
-
-            <input
-                type="email"
-                id="signupEmail"
-                placeholder="you@example.com"
-                autocomplete="email"
-            >
-
-
-            <label>
-                Password
-            </label>
-
-            <div class="password-wrap">
-
-                <input
-                    type="password"
-                    id="signupPassword"
-                    placeholder="Create a password"
-                    autocomplete="new-password"
-                >
-
-                <button
-                    type="button"
-                    onclick="togglePassword('signupPassword')"
-                >
-                    👁️
-                </button>
-
-            </div>
-
-
-            <!-- PASSWORD RULES -->
-
-            <div class="password-rules signup-rules">
-
-                <p id="signupRuleLength">
-                    ○ At least 8 characters
-                </p>
-
-                <p id="signupRuleCapital">
-                    ○ At least 1 capital letter
-                </p>
-
-                <p id="signupRuleNumber">
-                    ○ At least 1 number
-                </p>
-
-            </div>
-
-
-            <!-- CAPTCHA -->
-
-            <div class="captcha-box">
-
-                <div class="captcha-heading">
-                    🛡️ Security Check
-                </div>
-
-                <div class="captcha-question">
-
-                    <strong id="captchaQuestion">
-                        2 + 3
-                    </strong>
-
-                    <button
-                        type="button"
-                        onclick="generateCaptcha()"
-                    >
-                        🔄
-                    </button>
-
-                </div>
-
-                <input
-                    type="number"
-                    id="captchaAnswer"
-                    placeholder="Enter answer"
-                >
-
-            </div>
-
-
-            <button
-                class="auth-button"
-                onclick="createAccount()"
-            >
-                🚀 Create Account
-            </button>
-
-
-            <p class="switch-auth">
-
-                Already have an account?
-
-                <button onclick="showLogin()">
-                    Sign In
-                </button>
-
-            </p>
-
-        </div>
-
-
-
-        <!-- =====================================
-             LOGIN
-        ====================================== -->
-
-        <div
-            id="loginForm"
-            class="auth-form hidden"
-        >
-
-            <div class="auth-heading">
-
-                <h2>
-                    Welcome Back 👋
-                </h2>
-
-                <p>
-                    Sign in to continue.
-                </p>
-
-            </div>
-
-
-            <label>
-                Email
-            </label>
-
-            <input
-                type="email"
-                id="loginEmail"
-                placeholder="you@example.com"
-                autocomplete="email"
-            >
-
-
-            <label>
-                Password
-            </label>
-
-            <div class="password-wrap">
-
-                <input
-                    type="password"
-                    id="loginPassword"
-                    placeholder="Your password"
-                    autocomplete="current-password"
-                >
-
-                <button
-                    type="button"
-                    onclick="togglePassword('loginPassword')"
-                >
-                    👁️
-                </button>
-
-            </div>
-
-
-            <button
-                type="button"
-                class="forgot-password"
-                onclick="showForgotPassword()"
-            >
-                Forgot Password?
-            </button>
-
-
-            <button
-                class="auth-button"
-                onclick="login()"
-            >
-                🔓 Sign In
-            </button>
-
-
-            <p class="switch-auth">
-
-                Don't have an account?
-
-                <button onclick="showSignup()">
-                    Create Account
-                </button>
-
-            </p>
-
-        </div>
-
-
-
-        <!-- =====================================
-             FORGOT PASSWORD
-        ====================================== -->
-
-        <div
-            id="forgotForm"
-            class="auth-form hidden"
-        >
-
-            <div class="forgot-icon">
-                🔐
-            </div>
-
-            <div class="auth-heading">
-
-                <h2>
-                    Reset Password
-                </h2>
-
-                <p>
-                    Verify your registered email first.
-                </p>
-
-            </div>
-
-
-            <!-- STEP 1 -->
-
-            <div id="forgotStep1">
-
-                <label>
-                    Registered Email
-                </label>
-
-                <input
-                    type="email"
-                    id="forgotEmail"
-                    placeholder="you@example.com"
-                    autocomplete="email"
-                >
-
-
-                <button
-                    class="auth-button"
-                    onclick="verifyResetEmail()"
-                >
-                    🔎 Verify Email
-                </button>
-
-            </div>
-
-
-            <!-- STEP 2 -->
-
-            <div
-                id="forgotStep2"
-                class="hidden"
-            >
-
-                <div class="verification-success">
-
-                    <span>
-                        ✅
-                    </span>
-
-                    <p>
-                        Email verified successfully.
-                    </p>
-
-                </div>
-
-
-                <label>
-                    New Password
-                </label>
-
-                <div class="password-wrap">
-
-                    <input
-                        type="password"
-                        id="newPassword"
-                        placeholder="Create new password"
-                        autocomplete="new-password"
-                    >
-
-                    <button
-                        type="button"
-                        onclick="togglePassword('newPassword')"
-                    >
-                        👁️
-                    </button>
-
-                </div>
-
-
-                <div class="password-rules">
-
-                    <p id="ruleLength">
-                        ○ At least 8 characters
-                    </p>
-
-                    <p id="ruleCapital">
-                        ○ At least 1 capital letter
-                    </p>
-
-                    <p id="ruleNumber">
-                        ○ At least 1 number
-                    </p>
-
-                </div>
-
-
-                <label>
-                    Confirm New Password
-                </label>
-
-                <div class="password-wrap">
-
-                    <input
-                        type="password"
-                        id="confirmPassword"
-                        placeholder="Confirm password"
-                        autocomplete="new-password"
-                    >
-
-                    <button
-                        type="button"
-                        onclick="togglePassword('confirmPassword')"
-                    >
-                        👁️
-                    </button>
-
-                </div>
-
-
-                <button
-                    class="auth-button"
-                    onclick="resetPassword()"
-                >
-                    🔑 Renew Password
-                </button>
-
-            </div>
-
-
-            <p class="switch-auth">
-
-                Remember your password?
-
-                <button onclick="showLogin()">
-                    Sign In
-                </button>
-
-            </p>
-
-        </div>
-
+    <div class="brand">
+      <span class="brand-mark">F</span>
+      <span>Friend<span>Zone</span></span>
     </div>
+
+    <p class="eyebrow">PLAY • CONNECT • COMPETE</p>
+
+    <h1>One place for your whole friend group.</h1>
+
+    <p class="muted">
+      Games, friends, chat, rooms and competitions —
+      all in one place.
+    </p>
+
+    <div class="auth-tabs">
+      <button class="active" data-auth="login">Login</button>
+      <button data-auth="signup">Sign up</button>
+    </div>
+
+    <!-- LOGIN -->
+
+    <form id="loginForm">
+
+      <label>
+        Email
+        <input
+          id="loginEmail"
+          type="email"
+          placeholder="you@example.com"
+          required
+        >
+      </label>
+
+      <label>
+        Password
+        <input
+          id="loginPassword"
+          type="password"
+          placeholder="••••••••"
+          required
+        >
+      </label>
+
+      <button class="primary full" type="submit">
+        Enter FriendZone →
+      </button>
+
+      <button class="text-btn" type="button" id="forgotBtn">
+        Forgot password?
+      </button>
+
+    </form>
+
+    <!-- SIGN UP -->
+
+    <form id="signupForm" class="hidden">
+
+      <label>
+        Name
+        <input
+          id="signupName"
+          placeholder="Your name"
+          required
+        >
+      </label>
+
+      <label>
+        Email
+        <input
+          id="signupEmail"
+          type="email"
+          placeholder="you@example.com"
+          required
+        >
+      </label>
+
+      <label>
+        Password
+        <input
+          id="signupPassword"
+          type="password"
+          placeholder="8+ characters"
+          required
+        >
+      </label>
+
+      <div class="rules">
+        <span id="rLen">○ 8+ characters</span>
+        <span id="rCap">○ 1 capital</span>
+        <span id="rNum">○ 1 number</span>
+      </div>
+
+      <div class="captcha">
+        <span id="captchaText"></span>
+
+        <input
+          id="captchaInput"
+          placeholder="Answer"
+          required
+        >
+      </div>
+
+      <button class="primary full" type="submit">
+        Create my account →
+      </button>
+
+    </form>
+
+    <!-- FORGOT PASSWORD -->
+
+    <form id="forgotForm" class="hidden">
+
+      <h3>Renew your password</h3>
+
+      <p class="muted">
+        Enter your registered email to verify your account.
+      </p>
+
+      <label>
+        Email
+        <input
+          id="forgotEmail"
+          type="email"
+          placeholder="you@example.com"
+          required
+        >
+      </label>
+
+      <button class="primary full" type="submit">
+        Verify Email
+      </button>
+
+      <button class="text-btn" type="button" id="backLogin">
+        ← Back to Login
+      </button>
+
+    </form>
+
+    <div class="prototype-note">
+      FriendZone • Social Gaming Platform
+    </div>
+
+  </div>
 
 </section>
 
 
+<!-- ================= MAIN APP ================= -->
 
-<!-- =========================================
-     MAIN APPLICATION
-========================================= -->
+<main id="app" class="hidden">
 
-<div id="mainApp" class="hidden">
+<header class="topbar glass">
 
+  <button class="brand nav-home">
+    <span class="brand-mark">F</span>
+    <span>Friend<span>Zone</span></span>
+  </button>
 
-    <!-- NAVBAR -->
+  <nav>
 
-    <header class="navbar">
+    <button data-page="home" class="nav active">
+      Home
+    </button>
 
-        <div
-            class="logo"
-            onclick="showHome()"
-        >
-            🎮
-            <strong>
-                FriendZone
-            </strong>
-        </div>
+    <button data-page="games" class="nav">
+      Games
+    </button>
 
+    <button data-page="friends" class="nav">
+      Friends
+    </button>
 
-        <nav>
+    <button data-page="chat" class="nav">
+      Chat
+    </button>
 
-            <button onclick="showHome()">
-                Home
-            </button>
+    <button data-page="competitions" class="nav">
+      Compete
+    </button>
 
-            <button onclick="showGames()">
-                Games
-            </button>
+  </nav>
 
-            <button onclick="showBestFriends()">
-                ❤️
-            </button>
+  <button id="profileBtn" class="avatar">
+    A
+  </button>
 
-            <button onclick="showLeaderboard()">
-                🏆
-            </button>
+</header>
 
-        </nav>
 
+<!-- MOBILE NAV -->
 
-        <button
-            class="profile-button"
-            onclick="openProfile()"
-        >
-            👤
-        </button>
+<div class="mobile-nav glass">
 
-    </header>
+  <button data-page="home" class="nav active">
+    🏠
+    <small>Home</small>
+  </button>
 
+  <button data-page="games" class="nav">
+    🎮
+    <small>Games</small>
+  </button>
 
+  <button data-page="friends" class="nav">
+    👥
+    <small>Friends</small>
+  </button>
 
-    <main>
+  <button data-page="chat" class="nav">
+    💬
+    <small>Chat</small>
+  </button>
 
-
-        <!-- =====================================
-             HOME
-        ====================================== -->
-
-        <section
-            id="homePage"
-            class="page active"
-        >
-
-            <div class="hero">
-
-                <div class="hero-badge">
-                    🔥 YOUR FRIEND GROUP'S PLAYGROUND
-                </div>
-
-
-                <h1>
-
-                    PLAY.<br>
-
-                    <span>
-                        LAUGH.
-                    </span><br>
-
-                    REPEAT.
-
-                </h1>
-
-
-                <p>
-                    Games, challenges and friendship.
-                    Everything your squad needs in one place.
-                </p>
-
-
-                <div class="hero-buttons">
-
-                    <button
-                        class="primary-button"
-                        onclick="showGames()"
-                    >
-                        🎮 PLAY NOW
-                    </button>
-
-
-                    <button
-                        class="secondary-button"
-                        onclick="showBestFriends()"
-                    >
-                        ❤️ Best Friends
-                    </button>
-
-                </div>
-
-            </div>
-
-
-
-            <!-- FRIEND THOUGHT -->
-
-            <div class="thought-card">
-
-                <div class="thought-icon">
-                    💭
-                </div>
-
-                <div>
-
-                    <small>
-                        FRIEND'S THOUGHT
-                    </small>
-
-                    <h3 id="friendThought">
-                        "Whoever loses has to buy snacks."
-                    </h3>
-
-                    <p id="thoughtAuthor">
-                        — Your Squad 😂
-                    </p>
-
-                </div>
-
-                <button onclick="newThought()">
-                    🔄
-                </button>
-
-            </div>
-
-
-
-            <!-- BEST FRIEND PREVIEW -->
-
-            <section class="section">
-
-                <div class="section-title">
-
-                    <div>
-
-                        <small>
-                            YOUR INNER CIRCLE
-                        </small>
-
-                        <h2>
-                            ❤️ Best Friends
-                        </h2>
-
-                    </div>
-
-
-                    <button onclick="showBestFriends()">
-                        View →
-                    </button>
-
-                </div>
-
-
-                <div
-                    id="bestFriendsPreview"
-                    class="best-friends-preview"
-                >
-
-                    <!-- Empty until real friends are accepted -->
-
-                </div>
-
-            </section>
-
-
-
-            <!-- FEATURED GAMES -->
-
-            <section class="section">
-
-                <div class="section-title">
-
-                    <div>
-
-                        <small>
-                            WHAT'S HOT
-                        </small>
-
-                        <h2>
-                            🔥 Featured Games
-                        </h2>
-
-                    </div>
-
-
-                    <button onclick="showGames()">
-                        See All →
-                    </button>
-
-                </div>
-
-
-                <div class="games-grid">
-
-                    <div
-                        class="game-card purple"
-                        onclick="openGame('tictactoe')"
-                    >
-
-                        <div class="game-icon">
-                            ❌⭕
-                        </div>
-
-                        <h3>
-                            Tic Tac Toe
-                        </h3>
-
-                        <p>
-                            Classic 2-player battle
-                        </p>
-
-                    </div>
-
-
-                    <div
-                        class="game-card red"
-                        onclick="openGame('rps')"
-                    >
-
-                        <div class="game-icon">
-                            ✊
-                        </div>
-
-                        <h3>
-                            Rock Paper Scissors
-                        </h3>
-
-                        <p>
-                            Beat your opponent
-                        </p>
-
-                    </div>
-
-
-                    <div
-                        class="game-card green"
-                        onclick="openGame('reaction')"
-                    >
-
-                        <div class="game-icon">
-                            🎯
-                        </div>
-
-                        <h3>
-                            Reaction Test
-                        </h3>
-
-                        <p>
-                            How fast are you?
-                        </p>
-
-                    </div>
-
-
-                    <div
-                        class="game-card blue"
-                        onclick="openGame('memory')"
-                    >
-
-                        <div class="game-icon">
-                            🧠
-                        </div>
-
-                        <h3>
-                            Memory Master
-                        </h3>
-
-                        <p>
-                            Test your brain
-                        </p>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-
-
-            <!-- STATS -->
-
-            <section class="stats-card">
-
-                <div>
-
-                    <strong id="gamesPlayed">
-                        0
-                    </strong>
-
-                    <span>
-                        Games Played
-                    </span>
-
-                </div>
-
-
-                <div>
-
-                    <strong id="totalScore">
-                        0
-                    </strong>
-
-                    <span>
-                        Total Score
-                    </span>
-
-                </div>
-
-
-                <div>
-
-                    <strong id="wins">
-                        0
-                    </strong>
-
-                    <span>
-                        Wins
-                    </span>
-
-                </div>
-
-            </section>
-
-        </section>
-
-
-
-        <!-- =====================================
-             GAMES
-        ====================================== -->
-
-        <section
-            id="gamesPage"
-            class="page"
-        >
-
-            <div class="page-heading">
-
-                <small>
-                    CHOOSE YOUR BATTLE
-                </small>
-
-                <h1>
-                    🎮 Game Zone
-                </h1>
-
-                <p>
-                    Pick a game and challenge your friends.
-                </p>
-
-            </div>
-
-
-            <div class="all-games-grid">
-
-                <div
-                    class="game-card purple"
-                    onclick="openGame('tictactoe')"
-                >
-                    <div class="game-icon">❌⭕</div>
-                    <h3>Tic Tac Toe</h3>
-                    <p>Classic battle</p>
-                    <button>PLAY</button>
-                </div>
-
-
-                <div
-                    class="game-card red"
-                    onclick="openGame('rps')"
-                >
-                    <div class="game-icon">✊</div>
-                    <h3>Rock Paper Scissors</h3>
-                    <p>Choose wisely</p>
-                    <button>PLAY</button>
-                </div>
-
-
-                <div
-                    class="game-card green"
-                    onclick="openGame('reaction')"
-                >
-                    <div class="game-icon">🎯</div>
-                    <h3>Reaction Test</h3>
-                    <p>Test your speed</p>
-                    <button>PLAY</button>
-                </div>
-
-
-                <div
-                    class="game-card blue"
-                    onclick="openGame('memory')"
-                >
-                    <div class="game-icon">🧠</div>
-                    <h3>Memory Master</h3>
-                    <p>Test your brain</p>
-                    <button>PLAY</button>
-                </div>
-
-
-                <div
-                    class="game-card orange"
-                    onclick="openGame('guess')"
-                >
-                    <div class="game-icon">🔢</div>
-                    <h3>Guess Number</h3>
-                    <p>Can you guess it?</p>
-                    <button>PLAY</button>
-                </div>
-
-
-                <div
-                    class="game-card lime"
-                    onclick="openGame('snake')"
-                >
-                    <div class="game-icon">🐍</div>
-                    <h3>Snake</h3>
-                    <p>Don't hit yourself</p>
-                    <button>PLAY</button>
-                </div>
-
-
-                <div
-                    class="game-card gold"
-                    onclick="openGame('dice')"
-                >
-                    <div class="game-icon">🎲</div>
-                    <h3>Dice Battle</h3>
-                    <p>Luck decides</p>
-                    <button>PLAY</button>
-                </div>
-
-
-                <div
-                    class="game-card pink"
-                    onclick="openGame('roast')"
-                >
-                    <div class="game-icon">😂</div>
-                    <h3>Roast Me</h3>
-                    <p>Prepare yourself 💀</p>
-                    <button>PLAY</button>
-                </div>
-
-
-                <div
-                    class="game-card heart"
-                    onclick="openGame('friendship')"
-                >
-                    <div class="game-icon">❤️</div>
-                    <h3>Friendship Test</h3>
-                    <p>Test your bond</p>
-                    <button>PLAY</button>
-                </div>
-
-
-                <div
-                    class="game-card violet"
-                    onclick="openGame('future')"
-                >
-                    <div class="game-icon">🔮</div>
-                    <h3>Future Generator</h3>
-                    <p>See your destiny</p>
-                    <button>PLAY</button>
-                </div>
-
-            </div>
-
-        </section>
-
-
-
-        <!-- =====================================
-             BEST FRIENDS
-        ====================================== -->
-
-        <section
-            id="bestFriendsPage"
-            class="page"
-        >
-
-            <div class="page-heading">
-
-                <small>
-                    YOUR INNER CIRCLE
-                </small>
-
-                <h1>
-                    ❤️ Best Friends
-                </h1>
-
-                <p>
-                    Friendship becomes official only
-                    when both people accept it.
-                </p>
-
-            </div>
-
-
-
-            <!-- MY FRIEND ID -->
-
-            <div class="my-id-card">
-
-                <div>
-
-                    <small>
-                        YOUR FRIEND ID
-                    </small>
-
-                    <h2 id="myFriendId">
-                        FZ-000000
-                    </h2>
-
-                    <p>
-                        Share this ID with someone you know.
-                    </p>
-
-                </div>
-
-
-                <button onclick="copyFriendId()">
-                    📋 Copy ID
-                </button>
-
-            </div>
-
-
-
-            <!-- ADD FRIEND -->
-
-            <div class="request-box">
-
-                <div class="request-heading">
-
-                    <div class="request-icon">
-                        ❤️
-                    </div>
-
-                    <div>
-
-                        <h2>
-                            Add Best Friend
-                        </h2>
-
-                        <p>
-                            Enter their Friend ID.
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <input
-                    type="text"
-                    id="friendIdInput"
-                    placeholder="Example: FZ-123456"
-                    maxlength="9"
-                >
-
-
-                <button
-                    class="primary-button full-button"
-                    onclick="sendBestFriendRequest()"
-                >
-                    ❤️ Send Request
-                </button>
-
-            </div>
-
-
-
-            <!-- REQUESTS -->
-
-            <div class="friend-section">
-
-                <div class="section-title">
-
-                    <div>
-
-                        <small>
-                            WAITING FOR YOU
-                        </small>
-
-                        <h2>
-                            📩 Requests
-                        </h2>
-
-                    </div>
-
-                </div>
-
-
-                <div
-                    id="friendRequests"
-                    class="empty-state"
-                >
-
-                    <div>
-                        📭
-                    </div>
-
-                    <h3>
-                        No requests
-                    </h3>
-
-                    <p>
-                        When someone sends you a
-                        Best Friend request, it will appear here.
-                    </p>
-
-                </div>
-
-            </div>
-
-
-
-            <!-- BEST FRIEND LIST -->
-
-            <div class="friend-section">
-
-                <div class="section-title">
-
-                    <div>
-
-                        <small>
-                            OFFICIAL
-                        </small>
-
-                        <h2>
-                            ❤️ My Best Friends
-                        </h2>
-
-                    </div>
-
-                </div>
-
-
-                <div
-                    id="bestFriendsList"
-                    class="empty-state"
-                >
-
-                    <div>
-                        ❤️
-                    </div>
-
-                    <h3>
-                        No Best Friends yet
-                    </h3>
-
-                    <p>
-                        Send a request to someone
-                        and wait for them to accept.
-                    </p>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-
-        <!-- =====================================
-             LEADERBOARD
-        ====================================== -->
-
-        <section
-            id="leaderboardPage"
-            class="page"
-        >
-
-            <div class="page-heading">
-
-                <small>
-                    WHO'S THE GOAT?
-                </small>
-
-                <h1>
-                    🏆 Leaderboard
-                </h1>
-
-                <p>
-                    Play more. Score more. Flex more.
-                </p>
-
-            </div>
-
-
-            <div class="leaderboard">
-
-                <div class="leader first">
-
-                    <span>
-                        🥇
-                    </span>
-
-                    <strong id="rank1Name">
-                        You
-                    </strong>
-
-                    <b id="rank1Score">
-                        0
-                    </b>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-
-        <!-- =====================================
-             GAME SCREEN
-        ====================================== -->
-
-        <section
-            id="gamePage"
-            class="page"
-        >
-
-            <button
-                class="back-button"
-                onclick="showGames()"
-            >
-                ← Back to Games
-            </button>
-
-
-            <div id="gameContainer">
-
-                <!-- Games will be added here -->
-
-            </div>
-
-        </section>
-
-    </main>
+  <button data-page="competitions" class="nav">
+    🏆
+    <small>Compete</small>
+  </button>
 
 </div>
 
 
+<div class="container">
 
-<!-- =========================================
-     PROFILE MODAL
-========================================= -->
+<!-- ================= HOME ================= -->
 
-<div
-    id="profileModal"
-    class="modal"
->
+<section id="page-home" class="page active-page">
 
-    <div class="modal-content">
+  <div class="hero glass">
 
-        <button
-            class="close-button"
-            onclick="closeProfile()"
-        >
-            ✕
+    <div>
+
+      <p class="eyebrow">
+        WELCOME BACK,
+        <span id="helloName">PLAYER</span>
+      </p>
+
+      <h2>
+        Make memories.<br>
+        <span>Not boring evenings.</span>
+      </h2>
+
+      <p class="hero-copy">
+        Play games, challenge your friends,
+        create private rooms or enter competitions.
+      </p>
+
+      <div class="hero-actions">
+
+        <button class="primary" data-page="games">
+          Play Now ↗
         </button>
 
-
-        <div class="profile-avatar">
-            😎
-        </div>
-
-
-        <h2 id="profileName">
-            Your Name
-        </h2>
-
-
-        <p>
-            Your FriendZone ID
-        </p>
-
-
-        <div class="profile-id">
-            <span id="profileFriendId">
-                FZ-000000
-            </span>
-
-            <button onclick="copyFriendId()">
-                📋
-            </button>
-        </div>
-
-
-        <button
-            class="logout-button"
-            onclick="logout()"
-        >
-            🚪 Sign Out
+        <button class="secondary" data-page="friends">
+          Find Friends
         </button>
+
+      </div>
 
     </div>
 
+    <div class="hero-art">
+
+      <div class="ring">
+        FZ
+      </div>
+
+      <div class="float-card">
+        🔥 <b>12,840</b>
+        <small>players having fun</small>
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="section-head">
+
+    <div>
+      <p class="eyebrow">QUICK START</p>
+      <h3>Pick your vibe</h3>
+    </div>
+
+    <button class="ghost" data-page="games">
+      View all →
+    </button>
+
+  </div>
+
+  <div class="game-grid" id="quickGames"></div>
+
+
+  <div class="dashboard-grid">
+
+    <div class="panel glass">
+
+      <div class="section-head compact">
+
+        <h3>⚡ Today's Energy</h3>
+
+        <span class="live">
+          LIVE
+        </span>
+
+      </div>
+
+      <div class="energy">
+
+        <strong id="score">0</strong>
+
+        <span>
+          FriendZone XP
+        </span>
+
+        <div class="meter">
+          <i id="meter"></i>
+        </div>
+
+      </div>
+
+      <p class="muted">
+        Play games and win matches to increase your XP.
+      </p>
+
+    </div>
+
+
+    <div class="panel glass thought">
+
+      <p class="eyebrow">
+        FRIENDZONE THOUGHT
+      </p>
+
+      <h3 id="thought">
+        Bro said “one game” 47 minutes ago.
+      </h3>
+
+      <button class="ghost" id="newThought">
+        Another one ↻
+      </button>
+
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- ================= GAMES ================= -->
+
+<section id="page-games" class="page">
+
+  <div class="page-title">
+
+    <div>
+
+      <p class="eyebrow">
+        THE PLAYGROUND
+      </p>
+
+      <h2>
+        Games for every mood.
+      </h2>
+
+      <p class="muted">
+        Solo, random match or private room with friends.
+      </p>
+
+    </div>
+
+    <button class="primary" id="createRoom">
+      ＋ Create Room
+    </button>
+
+  </div>
+
+
+  <div class="filters">
+
+    <button class="filter active">
+      All
+    </button>
+
+    <button class="filter">
+      1v1
+    </button>
+
+    <button class="filter">
+      Multiplayer
+    </button>
+
+    <button class="filter">
+      Solo
+    </button>
+
+  </div>
+
+
+  <div
+    class="game-grid big"
+    id="allGames">
+  </div>
+
+</section>
+
+
+<!-- ================= FRIENDS ================= -->
+
+<section id="page-friends" class="page">
+
+  <div class="page-title">
+
+    <div>
+
+      <p class="eyebrow">
+        YOUR CIRCLE
+      </p>
+
+      <h2>
+        Friends & Best Friends.
+      </h2>
+
+      <p class="muted">
+        First become friends. Then choose your Best Friends.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="friend-tools glass">
+
+    <div>
+
+      <label>
+        My Friend ID
+      </label>
+
+      <div class="id-row">
+
+        <strong id="friendId">
+          FZ-000000
+        </strong>
+
+        <button class="secondary" id="copyId">
+          Copy
+        </button>
+
+      </div>
+
+    </div>
+
+
+    <div>
+
+      <label>
+        Add a Friend
+      </label>
+
+      <div class="id-row">
+
+        <input
+          id="friendInput"
+          placeholder="Enter Friend ID"
+        >
+
+        <button
+          class="primary"
+          id="sendRequest"
+        >
+          Send Request
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="dashboard-grid">
+
+    <div class="panel glass">
+
+      <div class="section-head compact">
+
+        <h3>
+          👥 My Friends
+        </h3>
+
+        <span id="friendCount">
+          0
+        </span>
+
+      </div>
+
+      <div
+        id="friendsList"
+        class="list empty"
+      >
+        No friends yet.
+      </div>
+
+    </div>
+
+
+    <div class="panel glass">
+
+      <div class="section-head compact">
+
+        <h3>
+          ❤️ Best Friends
+        </h3>
+
+        <span>
+          Your choice
+        </span>
+
+      </div>
+
+      <div
+        id="bestList"
+        class="list empty"
+      >
+        Your Best Friends will appear here.
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div class="panel glass">
+
+    <div class="section-head compact">
+
+      <h3>
+        📨 Friend Requests
+      </h3>
+
+    </div>
+
+    <div
+      id="requestList"
+      class="list empty"
+    >
+      No pending requests.
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- ================= CHAT ================= -->
+
+<section id="page-chat" class="page">
+
+  <div class="page-title">
+
+    <div>
+
+      <p class="eyebrow">
+        SOCIAL
+      </p>
+
+      <h2>
+        Chat with your people.
+      </h2>
+
+      <p class="muted">
+        Only accepted friends can chat.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="chat-layout glass">
+
+    <aside>
+
+      <div class="chat-search">
+        🔍 Search friends
+      </div>
+
+      <div class="chat-person active">
+
+        <span class="avatar sm">
+          F
+        </span>
+
+        <div>
+
+          <b>
+            Your Friends
+          </b>
+
+          <small>
+            Start a conversation
+          </small>
+
+        </div>
+
+      </div>
+
+      <div class="chat-lock">
+        🔒 Only accepted friends can chat.
+      </div>
+
+    </aside>
+
+
+    <div class="chat-empty">
+
+      <div class="chat-icon">
+        💬
+      </div>
+
+      <h3>
+        Your Conversations
+      </h3>
+
+      <p class="muted">
+        Add and accept a friend first.
+      </p>
+
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- ================= COMPETITIONS ================= -->
+
+<section id="page-competitions" class="page">
+
+  <div class="page-title">
+
+    <div>
+
+      <p class="eyebrow">
+        CLIMB THE LADDER
+      </p>
+
+      <h2>
+        Compete with everyone.
+      </h2>
+
+      <p class="muted">
+        Matchmaking, rooms and tournaments.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="competition-grid">
+
+    <div class="competition-card glass">
+
+      <span class="badge">
+        LIVE
+      </span>
+
+      <h3>
+        ⚡ Quick Match
+      </h3>
+
+      <p>
+        Get matched with an available player automatically.
+      </p>
+
+      <button class="primary" id="quickMatch">
+        Find Opponent
+      </button>
+
+    </div>
+
+
+    <div class="competition-card glass">
+
+      <span class="badge">
+        ROOM
+      </span>
+
+      <h3>
+        🏠 Private Room
+      </h3>
+
+      <p>
+        Create a room and invite your friends.
+      </p>
+
+      <button class="secondary" id="createRoom2">
+        Create Room
+      </button>
+
+    </div>
+
+
+    <div class="competition-card glass">
+
+      <span class="badge">
+        TOURNAMENT
+      </span>
+
+      <h3>
+        🏆 Weekly Cup
+      </h3>
+
+      <p>
+        Fight through rounds and become champion.
+      </p>
+
+      <button class="secondary" id="tournament">
+        View Tournament
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <div class="panel glass leaderboard">
+
+    <div class="section-head">
+
+      <div>
+
+        <p class="eyebrow">
+          GLOBAL
+        </p>
+
+        <h3>
+          Leaderboard
+        </h3>
+
+      </div>
+
+      <span class="live">
+        THIS WEEK
+      </span>
+
+    </div>
+
+
+    <div class="rank">
+
+      <b>#1</b>
+
+      <span>
+        👑
+      </span>
+
+      <strong>
+        Waiting for champion
+      </strong>
+
+      <span>
+        —
+      </span>
+
+    </div>
+
+
+    <div class="rank">
+
+      <b>#2</b>
+
+      <span>
+        🥈
+      </span>
+
+      <strong>
+        Play to claim it
+      </strong>
+
+      <span>
+        —
+      </span>
+
+    </div>
+
+
+    <div class="rank">
+
+      <b>#3</b>
+
+      <span>
+        🥉
+      </span>
+
+      <strong>
+        Your name could be here
+      </strong>
+
+      <span>
+        —
+      </span>
+
+    </div>
+
+  </div>
+
+</section>
+
 </div>
 
+</main>
 
 
-<!-- =========================================
-     TOAST
-========================================= -->
+<!-- ================= MODAL ================= -->
 
-<div
-    id="toast"
-    class="toast"
->
-    🎉 Nice!
+<div id="modal" class="modal hidden">
+
+  <div class="modal-card glass">
+
+    <button
+      class="close"
+      id="closeModal"
+    >
+      ×
+    </button>
+
+    <div id="modalBody"></div>
+
+  </div>
+
 </div>
-
 
 
 <script src="script.js"></script>
 
 </body>
-
 </html>
