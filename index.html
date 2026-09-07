@@ -2303,31 +2303,39 @@
     aria-atomic="true"
   ></div>
 
+
 <!-- =========================================================
      SUPABASE
 ========================================================== -->
 
+<!-- Supabase JS library — MUST load before script.js -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-  const SUPABASE_URL = "https://hjdevuoxuoyenzmawwnb.supabase.co";
-
   /*
-   * IMPORTANT:
-   * Replace the value below with the REAL
-   * Publishable/Anon key from your Supabase project.
+   * FriendZone Supabase configuration
+   *
+   * Project URL:
+   * https://hjdevuoxuoyenzmawwnb.supabase.co
+   *
+   * Get the Publishable/Anon key from:
+   * Supabase Dashboard
+   * → Project
+   * → Settings
+   * → API
    */
-  const SUPABASE_ANON_KEY = "PASTE_YOUR_REAL_SUPABASE_PUBLISHABLE_KEY_HERE";
 
   window.FRIENDZONE_CONFIG = {
-    SUPABASE_URL: SUPABASE_URL,
-    SUPABASE_ANON_KEY: SUPABASE_ANON_KEY
+    SUPABASE_URL: "https://hjdevuoxuoyenzmawwnb.supabase.co",
+
+    // PASTE YOUR REAL SUPABASE PUBLISHABLE/ANON KEY HERE
+    SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqZGV2dW94dW95ZW56bWF3d25iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODgzNjYsImV4cCI6MjEwNDM2NDM2Nn0.-ER4x0hqUYss521B_FWAHnfWjtxg9YJIaWNXjQJPPhI"
   };
 </script>
 
 <!-- Main JavaScript -->
 <script src="script.js"></script>
-  
 
+  
 </body>
 </html>
