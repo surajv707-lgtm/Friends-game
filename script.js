@@ -9,14 +9,21 @@
    SUPABASE
    ========================================================= */
 
-const CONFIG = window.FRIENDZONE_CONFIG || {};
-
 const SUPABASE_URL =
-  CONFIG.SUPABASE_URL ||
+  window.FRIENDZONE_CONFIG?.SUPABASE_URL ||
   "https://hjdevuoxuoyenzmawwnb.supabase.co";
 
 const SUPABASE_ANON_KEY =
-  CONFIG.SUPABASE_ANON_KEY || "";
+  window.FRIENDZONE_CONFIG?.SUPABASE_ANON_KEY || "";
+
+if (!SUPABASE_ANON_KEY) {
+  console.error("Supabase API key is missing.");
+}
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
 
 let supabaseClient = null;
 
