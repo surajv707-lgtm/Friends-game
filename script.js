@@ -1,2201 +1,1393 @@
-
-/* =========================================
-   FRIENDZONE
-   AUTH + FRIEND SYSTEM FOUNDATION
-========================================= */
+const $ = selector => document.querySelector(selector);
+const $$ = selector => document.querySelectorAll(selector);
 
 
-/* =========================================
-   GLOBAL DATA
-========================================= */
+/* ================= GAMES ================= */
 
-let player = {
+const games = [
 
-    name: "",
+  ["🎯","Tic Tac Toe","1v1 • Room","purple"],
+  ["✊","Rock Paper Scissors","1v1 • Random","red"],
+  ["⚡","Reaction Rush","Solo • Score","green"],
+  ["🧠","Memory Clash","1v1 • Room","blue"],
+  ["🔢","Guess Number","1v1 • Random","orange"],
+  ["🐍","Snake","Solo • Score","lime"],
+  ["🎲","Dice Battle","Multiplayer","gold"],
+  ["🔥","Roast Me","Party","pink"],
+  ["❤️","Friendship Test","Friends","heart"],
+  ["🔮","Future Generator","Party","violet"],
+  ["🧩","Connect 4","1v1 • Room","blue"],
+  ["❓","Quiz Battle","Multiplayer","purple"]
 
-    email: "",
+];
 
-    friendId: "",
 
-    games: 0,
+/* ================= DATA ================= */
 
-    score: 0,
+const thoughts = [
 
-    wins: 0
+  "Bro said “one game” 47 minutes ago.",
+  "Your friend is online. Your productivity is offline.",
+  "If losing was a skill, your squad would be professional.",
+  "One more match. Famous last words.",
+  "Best friends are basically free teammates.",
+  "Someone in your friend list is definitely waiting for you."
+
+];
+
+let thoughtIndex = 0;
+
+let captchaA = 0;
+let captchaB = 0;
+
+let user =
+  JSON.parse(
+    localStorage.getItem("fz_user")
+  );
+
+let friends =
+  JSON.parse(
+    localStorage.getItem("fz_friends") || "[]"
+  );
+
+let best =
+  JSON.parse(
+    localStorage.getItem("fz_best") || "[]"
+  );
+
+let requests =
+  JSON.parse(
+    localStorage.getItem("fz_requests") || "[]"
+  );
+
+let score =
+  Number(
+    localStorage.getItem("fz_score") || 0
+  );
+
+
+/* ================= TOAST ================= */
+
+function toast(message){
+
+  const box = $("#toast");
+
+  box.textContent = message;
+
+  box.classList.add("show");
+
+  clearTimeout(window.toastTimer);
+
+  window.toastTimer =
+    setTimeout(
+      () => box.classList.remove("show"),
+      2500
+    );
+}
+
+
+/* ================= PASSWORD ================= */
+
+function validatePassword(password){
+
+  return (
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[0-9]/.test(password)
+  );
+
+}
+
+
+/* ================= CAPTCHA ================= */
+
+function createCaptcha(){
+
+  captchaA =
+    Math.floor(Math.random() * 8) + 1;
+
+  captchaB =
+    Math.floor(Math.random() * 8) + 1;
+
+  $("#captchaText").textContent =
+    `${captchaA} + ${captchaB} = ?`;
+
+}
+
+
+/* ================= GAME UI ================= */
+
+function renderGames(target){
+
+  $(target).innerHTML =
+    games.map(
+      (game,index) => `
+
+        <article class="game-card ${game[3]}">
+
+          <div class="game-icon">
+            ${game[0]}
+          </div>
+
+          <h4>
+            ${game[1]}
+          </h4>
+
+          <p>
+            ${game[2]}
+          </p>
+
+          <button
+            class="play"
+            onclick="launchGame(${index})"
+          >
+            →
+          </button>
+
+        </article>
+
+      `
+    ).join("");
+
+}
+
+
+function launchGame(index){
+
+  const game = games[index];
+
+  score += 10;
+
+  localStorage.setItem(
+    "fz_score",
+    score
+  );
+
+  $("#score").textContent = score;
+
+  $("#meter").style.width =
+    Math.min(
+      100,
+      score % 101
+    ) + "%";
+
+
+  openModal(`
+
+    <p class="eyebrow">
+      GAME LOBBY
+    </p>
+
+    <h2>
+      ${game[0]} ${game[1]}
+    </h2>
+
+    <p class="muted">
+      Choose how you want to play.
+    </p>
+
+    <div class="dashboard-grid">
+
+      <button
+        class="primary"
+        onclick="toast('Matchmaking started!')"
+      >
+        ⚡ Random Match
+      </button>
+
+      <button
+        class="secondary"
+        onclick="toast('Room created!')"
+      >
+        🏠 Create Room
+      </button>
+
+    </div>
+
+    <p class="muted">
+      Multiplayer engine will be connected
+      with the backend.
+    </p>
+
+  `);
+
+}
+
+
+/* ================= PAGE NAVIGATION ================= */
+
+function showPage(page){
+
+  $$(".page").forEach(
+    pageElement =>
+      pageElement.classList.remove(
+        "active-page"
+      )
+  );
+
+  const selected =
+    $(`#page-${page}`);
+
+  if(selected){
+    selected.classList.add(
+      "active-page"
+    );
+  }
+
+  $$(".nav").forEach(
+    button =>
+      button.classList.toggle(
+        "active",
+        button.dataset.page === page
+      )
+  );
+
+  window.scrollTo({
+    top:0,
+    behavior:"smooth"
+  });
+
+}
+
+
+/* ================= FRIEND ID ================= */
+
+function generateFriendID(){
+
+  return (
+    "FZ-" +
+    Math.floor(
+      100000 +
+      Math.random() * 900000
+    )
+  );
+
+}
+
+
+/* ================= STORAGE ================= */
+
+function saveFriends(){
+
+  localStorage.setItem(
+    "fz_friends",
+    JSON.stringify(friends)
+  );
+
+  localStorage.setItem(
+    "fz_best",
+    JSON.stringify(best)
+  );
+
+  localStorage.setItem(
+    "fz_requests",
+    JSON.stringify(requests)
+  );
+
+}
+
+
+/* ================= FRIEND RENDER ================= */
+
+function renderFriends(){
+
+  $("#friendCount").textContent =
+    friends.length;
+
+
+  /* FRIENDS */
+
+  if(friends.length){
+
+    $("#friendsList").innerHTML =
+      friends.map(
+        (friend,index) => `
+
+          <div class="friend-item">
+
+            <span class="avatar sm">
+              ${friend.name[0].toUpperCase()}
+            </span>
+
+            <div class="grow">
+
+              <b>
+                ${escapeHTML(friend.name)}
+              </b>
+
+              <small>
+                ${escapeHTML(friend.id)}
+              </small>
+
+            </div>
+
+            <div class="mini-actions">
+
+              <button
+                class="secondary"
+                onclick="toggleBest(${index})"
+              >
+                ${best.includes(friend.id) ? "❤️" : "♡"}
+              </button>
+
+              <button
+                class="secondary"
+                onclick="toast('Chat will open here.')"
+              >
+                💬
+              </button>
+
+            </div>
+
+          </div>
+
+        `
+      ).join("");
+
+  }else{
+
+    $("#friendsList").innerHTML =
+      `
+        <div class="empty">
+          No friends yet.
+          Add someone using their Friend ID.
+        </div>
+      `;
+
+  }
+
+
+  /* BEST FRIENDS */
+
+  if(best.length){
+
+    $("#bestList").innerHTML =
+      best.map(
+        id => {
+
+          const friend =
+            friends.find(
+              f => f.id === id
+            );
+
+          if(!friend)
+            return "";
+
+          return `
+
+            <div class="friend-item">
+
+              <span class="avatar sm">
+                ❤️
+              </span>
+
+              <div class="grow">
+
+                <b>
+                  ${escapeHTML(friend.name)}
+                </b>
+
+                <small>
+                  Best Friend •
+                  ${escapeHTML(friend.id)}
+                </small>
+
+              </div>
+
+              <button
+                class="secondary"
+                onclick="removeBest('${friend.id}')"
+              >
+                Remove
+              </button>
+
+            </div>
+
+          `;
+
+        }
+      ).join("");
+
+  }else{
+
+    $("#bestList").innerHTML =
+      `
+        <div class="empty">
+          Choose ❤️ from your accepted friends.
+        </div>
+      `;
+
+  }
+
+
+  /* REQUESTS */
+
+  if(requests.length){
+
+    $("#requestList").innerHTML =
+      requests.map(
+        (request,index) => `
+
+          <div class="friend-item">
+
+            <span class="avatar sm">
+              ${request.name[0].toUpperCase()}
+            </span>
+
+            <div class="grow">
+
+              <b>
+                ${escapeHTML(request.name)}
+              </b>
+
+              <small>
+                Friend Request •
+                ${escapeHTML(request.id)}
+              </small>
+
+            </div>
+
+            <div class="mini-actions">
+
+              <button
+                class="primary"
+                onclick="acceptRequest(${index})"
+              >
+                Accept
+              </button>
+
+              <button
+                class="secondary"
+                onclick="rejectRequest(${index})"
+              >
+                Reject
+              </button>
+
+            </div>
+
+          </div>
+
+        `
+      ).join("");
+
+  }else{
+
+    $("#requestList").innerHTML =
+      `
+        <div class="empty">
+          No pending requests.
+        </div>
+      `;
+
+  }
+
+}
+
+
+/* ================= BEST FRIEND ================= */
+
+function toggleBest(index){
+
+  const id =
+    friends[index].id;
+
+  if(best.includes(id)){
+
+    best =
+      best.filter(
+        item => item !== id
+      );
+
+    toast("Removed from Best Friends");
+
+  }else{
+
+    best.push(id);
+
+    toast("Added to Best Friends ❤️");
+
+  }
+
+  saveFriends();
+
+  renderFriends();
+
+}
+
+
+function removeBest(id){
+
+  best =
+    best.filter(
+      item => item !== id
+    );
+
+  saveFriends();
+
+  renderFriends();
+
+  toast("Removed from Best Friends");
+
+}
+
+
+/* ================= SEND REQUEST ================= */
+
+function sendFriendRequest(){
+
+  const id =
+    $("#friendInput")
+      .value
+      .trim()
+      .toUpperCase();
+
+
+  if(!/^FZ-\d{6}$/.test(id)){
+
+    toast(
+      "Enter a valid Friend ID"
+    );
+
+    return;
+
+  }
+
+
+  if(user && id === user.id){
+
+    toast(
+      "You cannot add yourself"
+    );
+
+    return;
+
+  }
+
+
+  if(
+    friends.some(
+      friend => friend.id === id
+    )
+  ){
+
+    toast(
+      "Already your friend"
+    );
+
+    return;
+
+  }
+
+
+  /*
+    REAL requests will be stored
+    in the backend later.
+  */
+
+  toast(
+    "Friend request ready for backend."
+  );
+
+  $("#friendInput").value = "";
+
+}
+
+
+/* ================= ACCEPT / REJECT ================= */
+
+function acceptRequest(index){
+
+  const request =
+    requests[index];
+
+  friends.push({
+    id:request.id,
+    name:request.name
+  });
+
+  requests.splice(
+    index,
+    1
+  );
+
+  saveFriends();
+
+  renderFriends();
+
+  toast(
+    `${request.name} is now your friend!`
+  );
+
+}
+
+
+function rejectRequest(index){
+
+  requests.splice(
+    index,
+    1
+  );
+
+  saveFriends();
+
+  renderFriends();
+
+  toast(
+    "Request rejected"
+  );
+
+}
+
+
+/* ================= ESCAPE HTML ================= */
+
+function escapeHTML(value){
+
+  return String(value)
+    .replace(
+      /[&<>"']/g,
+      character => ({
+
+        "&":"&amp;",
+        "<":"&lt;",
+        ">":"&gt;",
+        '"':"&quot;",
+        "'":"&#039;"
+
+      }[character])
+    );
+
+}
+
+
+/* ================= MODAL ================= */
+
+function openModal(content){
+
+  $("#modalBody").innerHTML =
+    content;
+
+  $("#modal")
+    .classList
+    .remove("hidden");
+
+}
+
+
+function closeModal(){
+
+  $("#modal")
+    .classList
+    .add("hidden");
+
+}
+
+
+/* ================= LOGIN ================= */
+
+function enterApp(){
+
+  if(!user)
+    return;
+
+
+  $("#auth")
+    .classList
+    .add("hidden");
+
+  $("#app")
+    .classList
+    .remove("hidden");
+
+
+  $("#helloName")
+    .textContent =
+    user.name.toUpperCase();
+
+
+  $("#friendId")
+    .textContent =
+    user.id;
+
+
+  $("#profileBtn")
+    .textContent =
+    user.name[0]
+      .toUpperCase();
+
+
+  $("#score")
+    .textContent =
+    score;
+
+
+  $("#meter")
+    .style.width =
+    Math.min(
+      100,
+      score % 101
+    ) + "%";
+
+
+  renderFriends();
+
+}
+
+
+/* ================= PROFILE ================= */
+
+function openProfile(){
+
+  openModal(`
+
+    <p class="eyebrow">
+      YOUR PROFILE
+    </p>
+
+    <h2>
+      ${escapeHTML(user.name)}
+    </h2>
+
+    <p class="muted">
+      Friend ID:
+      <b>${user.id}</b>
+    </p>
+
+    <p class="muted">
+      FriendZone XP:
+      <b>${score}</b>
+    </p>
+
+    <button
+      class="secondary full"
+      onclick="logout()"
+    >
+      Log Out
+    </button>
+
+  `);
+
+}
+
+
+/* ================= LOGOUT ================= */
+
+function logout(){
+
+  user = null;
+
+  localStorage.removeItem(
+    "fz_user"
+  );
+
+  closeModal();
+
+  $("#app")
+    .classList
+    .add("hidden");
+
+  $("#auth")
+    .classList
+    .remove("hidden");
+
+  toast("Logged out");
+
+}
+
+
+/* ================= AUTH ================= */
+
+function setupAuth(){
+
+  createCaptcha();
+
+
+  /* TABS */
+
+  $$(".auth-tabs button")
+    .forEach(
+      button => {
+
+        button.onclick = () => {
+
+          $$(".auth-tabs button")
+            .forEach(
+              item =>
+                item.classList.remove(
+                  "active"
+                )
+            );
+
+          button.classList.add(
+            "active"
+          );
+
+
+          $("#loginForm")
+            .classList.toggle(
+              "hidden",
+              button.dataset.auth !== "login"
+            );
+
+
+          $("#signupForm")
+            .classList.toggle(
+              "hidden",
+              button.dataset.auth !== "signup"
+            );
+
+
+          $("#forgotForm")
+            .classList.add(
+              "hidden"
+            );
+
+        };
+
+      }
+    );
+
+
+  /* PASSWORD RULES */
+
+  $("#signupPassword")
+    .addEventListener(
+      "input",
+      event => {
+
+        const password =
+          event.target.value;
+
+
+        $("#rLen")
+          .textContent =
+          (password.length >= 8 ? "✓" : "○")
+          + " 8+ characters";
+
+
+        $("#rCap")
+          .textContent =
+          (/[A-Z]/.test(password) ? "✓" : "○")
+          + " 1 capital";
+
+
+        $("#rNum")
+          .textContent =
+          (/[0-9]/.test(password) ? "✓" : "○")
+          + " 1 number";
+
+      }
+    );
+
+
+  /* SIGNUP */
+
+  $("#signupForm")
+    .onsubmit =
+    event => {
+
+      event.preventDefault();
+
+
+      const password =
+        $("#signupPassword").value;
+
+
+      if(!validatePassword(password)){
+
+        toast(
+          "Password needs 8+ chars, 1 capital and 1 number"
+        );
+
+        return;
+
+      }
+
+
+      if(
+        Number(
+          $("#captchaInput").value
+        )
+        !==
+        captchaA + captchaB
+      ){
+
+        toast(
+          "CAPTCHA answer is incorrect"
+        );
+
+        return;
+
+      }
+
+
+      const account = {
+
+        name:
+          $("#signupName")
+            .value
+            .trim(),
+
+        email:
+          $("#signupEmail")
+            .value
+            .trim()
+            .toLowerCase(),
+
+        password,
+
+        id:
+          generateFriendID()
+
+      };
+
+
+      localStorage.setItem(
+        "fz_account",
+        JSON.stringify(account)
+      );
+
+
+      user = account;
+
+
+      localStorage.setItem(
+        "fz_user",
+        JSON.stringify(user)
+      );
+
+
+      toast(
+        "Account created!"
+      );
+
+
+      enterApp();
+
+    };
+
+
+  /* LOGIN */
+
+  $("#loginForm")
+    .onsubmit =
+    event => {
+
+      event.preventDefault();
+
+
+      const account =
+        JSON.parse(
+          localStorage.getItem(
+            "fz_account"
+          )
+        );
+
+
+      if(
+        !account ||
+        account.email !==
+          $("#loginEmail")
+            .value
+            .trim()
+            .toLowerCase() ||
+        account.password !==
+          $("#loginPassword").value
+      ){
+
+        toast(
+          "Invalid email or password"
+        );
+
+        return;
+
+      }
+
+
+      user = account;
+
+      localStorage.setItem(
+        "fz_user",
+        JSON.stringify(user)
+      );
+
+
+      enterApp();
+
+    };
+
+
+  /* FORGOT PASSWORD */
+
+  $("#forgotBtn")
+    .onclick = () => {
+
+      $("#loginForm")
+        .classList
+        .add("hidden");
+
+      $("#signupForm")
+        .classList
+        .add("hidden");
+
+      $("#forgotForm")
+        .classList
+        .remove("hidden");
+
+    };
+
+
+  $("#backLogin")
+    .onclick = () => {
+
+      $("#forgotForm")
+        .classList
+        .add("hidden");
+
+      $("#loginForm")
+        .classList
+        .remove("hidden");
+
+    };
+
+
+  $("#forgotForm")
+    .onsubmit =
+    event => {
+
+      event.preventDefault();
+
+
+      const account =
+        JSON.parse(
+          localStorage.getItem(
+            "fz_account"
+          )
+        );
+
+
+      const email =
+        $("#forgotEmail")
+          .value
+          .trim()
+          .toLowerCase();
+
+
+      if(
+        !account ||
+        account.email !== email
+      ){
+
+        toast(
+          "This email is not registered"
+        );
+
+        return;
+
+      }
+
+
+      openModal(`
+
+        <p class="eyebrow">
+          EMAIL VERIFIED
+        </p>
+
+        <h2>
+          Renew Password
+        </h2>
+
+        <p class="muted">
+          Create your new password.
+        </p>
+
+        <label>
+
+          New Password
+
+          <input
+            id="newPass"
+            type="password"
+            placeholder="8+ characters"
+          >
+
+        </label>
+
+        <br>
+
+        <button
+          class="primary full"
+          onclick="renewPassword()"
+        >
+          Renew Password
+        </button>
+
+      `);
+
+    };
+
+}
+
+
+/* ================= RENEW PASSWORD ================= */
+
+window.renewPassword =
+function(){
+
+  const password =
+    $("#newPass").value;
+
+
+  if(!validatePassword(password)){
+
+    toast(
+      "Password needs 8+ chars, 1 capital and 1 number"
+    );
+
+    return;
+
+  }
+
+
+  const account =
+    JSON.parse(
+      localStorage.getItem(
+        "fz_account"
+      )
+    );
+
+
+  account.password =
+    password;
+
+
+  localStorage.setItem(
+    "fz_account",
+    JSON.stringify(account)
+  );
+
+
+  closeModal();
+
+  toast(
+    "Password renewed successfully!"
+  );
 
 };
 
 
-/*
-    IMPORTANT:
-    There are NO fake/default friends.
-*/
+/* ================= CREATE ROOM ================= */
 
-let bestFriends = [];
+function createRoom(){
 
-let friendRequests = [];
+  openModal(`
 
+    <p class="eyebrow">
+      PRIVATE PLAY
+    </p>
 
-/* =========================================
-   FUN THOUGHTS
-========================================= */
+    <h2>
+      🏠 Create a Room
+    </h2>
 
-const thoughts = [
+    <p class="muted">
+      Choose a game and invite your friends.
+    </p>
 
-    {
-        text: "Whoever loses has to buy snacks.",
-        author: "Your Squad 😂"
-    },
+    <label>
 
-    {
-        text: "I came here to win. Friendship can wait.",
-        author: "Competitive Friend 🔥"
-    },
+      Game
 
-    {
-        text: "If I lose, the game is definitely broken.",
-        author: "That One Friend 💀"
-    },
+      <select>
 
-    {
-        text: "Nobody tell him he's losing.",
-        author: "The Group Chat 👀"
-    },
+        ${games.map(
+          game =>
+            `<option>
+              ${game[1]}
+            </option>`
+        ).join("")}
 
-    {
-        text: "I don't need luck. I need my friends to lose.",
-        author: "Certified Villain 😈"
-    },
+      </select>
 
-    {
-        text: "We are not fighting. We are competing aggressively.",
-        author: "Best Friend 🤝"
-    }
+    </label>
 
-];
+    <br>
 
+    <button
+      class="primary full"
+      onclick="toast('Room created!')"
+    >
+      Create Room
+    </button>
 
-/* =========================================
-   CAPTCHA
-========================================= */
-
-let captchaCorrectAnswer = 0;
-
-
-function generateCaptcha() {
-
-    const first =
-        Math.floor(
-            Math.random() * 10
-        ) + 1;
-
-
-    const second =
-        Math.floor(
-            Math.random() * 10
-        ) + 1;
-
-
-    captchaCorrectAnswer =
-        first + second;
-
-
-    const question =
-        document.getElementById(
-            "captchaQuestion"
-        );
-
-
-    if (question) {
-
-        question.textContent =
-            `${first} + ${second}`;
-
-    }
-
-
-    const answer =
-        document.getElementById(
-            "captchaAnswer"
-        );
-
-
-    if (answer) {
-
-        answer.value = "";
-
-    }
+  `);
 
 }
 
 
-/* =========================================
-   PASSWORD VALIDATION
-========================================= */
+/* ================= INIT ================= */
 
-function validatePassword(password) {
+$("#closeModal")
+  .onclick =
+  closeModal;
 
-    const length =
-        password.length >= 8;
 
-    const capital =
-        /[A-Z]/.test(password);
-
-    const number =
-        /[0-9]/.test(password);
-
-
-    return {
-
-        length: length,
-
-        capital: capital,
-
-        number: number,
-
-        valid:
-            length &&
-            capital &&
-            number
-
-    };
-
-}
-
-
-/* =========================================
-   UPDATE SIGNUP PASSWORD RULES
-========================================= */
-
-function updateSignupPasswordRules() {
-
-    const input =
-        document.getElementById(
-            "signupPassword"
-        );
-
-
-    if (!input) return;
-
-
-    const rules =
-        validatePassword(
-            input.value
-        );
-
-
-    updateRule(
-        "signupRuleLength",
-        rules.length,
-        "At least 8 characters"
-    );
-
-
-    updateRule(
-        "signupRuleCapital",
-        rules.capital,
-        "At least 1 capital letter"
-    );
-
-
-    updateRule(
-        "signupRuleNumber",
-        rules.number,
-        "At least 1 number"
-    );
-
-}
-
-
-/* =========================================
-   UPDATE RESET PASSWORD RULES
-========================================= */
-
-function updateResetPasswordRules() {
-
-    const input =
-        document.getElementById(
-            "newPassword"
-        );
-
-
-    if (!input) return;
-
-
-    const rules =
-        validatePassword(
-            input.value
-        );
-
-
-    updateRule(
-        "ruleLength",
-        rules.length,
-        "At least 8 characters"
-    );
-
-
-    updateRule(
-        "ruleCapital",
-        rules.capital,
-        "At least 1 capital letter"
-    );
-
-
-    updateRule(
-        "ruleNumber",
-        rules.number,
-        "At least 1 number"
-    );
-
-}
-
-
-/* =========================================
-   RULE UI
-========================================= */
-
-function updateRule(
-    id,
-    valid,
-    text
-) {
-
-    const element =
-        document.getElementById(id);
-
-
-    if (!element) return;
-
-
-    if (valid) {
-
-        element.textContent =
-            `✓ ${text}`;
-
-        element.classList.add(
-            "valid"
-        );
-
-    } else {
-
-        element.textContent =
-            `○ ${text}`;
-
-        element.classList.remove(
-            "valid"
-        );
-
-    }
-
-}
-
-
-/* =========================================
-   AUTH SCREEN
-========================================= */
-
-function showSignup() {
-
-    document
-        .getElementById("signupForm")
-        .classList.remove("hidden");
-
-    document
-        .getElementById("loginForm")
-        .classList.add("hidden");
-
-    document
-        .getElementById("forgotForm")
-        .classList.add("hidden");
-
-}
-
-
-function showLogin() {
-
-    document
-        .getElementById("signupForm")
-        .classList.add("hidden");
-
-    document
-        .getElementById("loginForm")
-        .classList.remove("hidden");
-
-    document
-        .getElementById("forgotForm")
-        .classList.add("hidden");
-
-}
-
-
-function showForgotPassword() {
-
-    document
-        .getElementById("signupForm")
-        .classList.add("hidden");
-
-    document
-        .getElementById("loginForm")
-        .classList.add("hidden");
-
-    document
-        .getElementById("forgotForm")
-        .classList.remove("hidden");
-
-
-    document
-        .getElementById("forgotStep1")
-        .classList.remove("hidden");
-
-
-    document
-        .getElementById("forgotStep2")
-        .classList.add("hidden");
-
-
-    document
-        .getElementById("forgotEmail")
-        .value = "";
-
-}
-
-
-/* =========================================
-   PASSWORD VISIBILITY
-========================================= */
-
-function togglePassword(id) {
-
-    const input =
-        document.getElementById(id);
-
-
-    if (!input) return;
-
-
-    if (
-        input.type === "password"
-    ) {
-
-        input.type = "text";
-
-    } else {
-
-        input.type = "password";
-
-    }
-
-}
-
-
-/* =========================================
-   GENERATE FRIEND ID
-========================================= */
-
-function generateFriendId() {
-
-    const number =
-        Math.floor(
-            100000 +
-            Math.random() * 900000
-        );
-
-
-    return `FZ-${number}`;
-
-}
-
-
-/* =========================================
-   CREATE ACCOUNT
-========================================= */
-
-function createAccount() {
-
-    const name =
-        document
-            .getElementById("signupName")
-            .value
-            .trim();
-
-
-    const email =
-        document
-            .getElementById("signupEmail")
-            .value
-            .trim()
-            .toLowerCase();
-
-
-    const password =
-        document
-            .getElementById("signupPassword")
-            .value;
-
-
-    const captcha =
-        Number(
-            document
-                .getElementById("captchaAnswer")
-                .value
-        );
-
-
-    /* NAME */
-
-    if (!name) {
-
-        showToast(
-            "Please enter your name 😭"
-        );
-
-        return;
-
-    }
-
-
-    /* EMAIL */
-
-    const validEmail =
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-            .test(email);
-
-
-    if (!validEmail) {
-
-        showToast(
-            "Enter a valid email 📧"
-        );
-
-        return;
-
-    }
-
-
-    /* PASSWORD */
-
-    const passwordRules =
-        validatePassword(password);
-
-
-    if (!passwordRules.valid) {
-
-        showToast(
-            "Password doesn't meet the requirements 🔐"
-        );
-
-        return;
-
-    }
-
-
-    /* CAPTCHA */
-
-    if (
-        captcha !==
-        captchaCorrectAnswer
-    ) {
-
-        showToast(
-            "CAPTCHA is incorrect 🤖"
-        );
-
-        generateCaptcha();
-
-        return;
-
-    }
-
-
-    /* EXISTING ACCOUNT */
-
-    const existing =
-        getAccount();
-
-
-    if (
-        existing &&
-        existing.email === email
-    ) {
-
-        showToast(
-            "This email is already registered."
-        );
-
-        return;
-
-    }
-
-
-    /* ACCOUNT */
-
-    const account = {
-
-        name: name,
-
-        email: email,
-
-        password: password,
-
-        friendId:
-            generateFriendId(),
-
-        createdAt:
-            new Date().toISOString()
-
-    };
-
-
-    localStorage.setItem(
-        "fz_account",
-        JSON.stringify(account)
-    );
-
-
-    localStorage.setItem(
-        "fz_logged_in",
-        "true"
-    );
-
-
-    /* PLAYER */
-
-    player.name =
-        account.name;
-
-    player.email =
-        account.email;
-
-    player.friendId =
-        account.friendId;
-
-
-    savePlayerStats();
-
-
-    showToast(
-        "Account created! Welcome 🎉"
-    );
-
-
-    setTimeout(
-        enterApp,
-        800
-    );
-
-}
-
-
-/* =========================================
-   LOGIN
-========================================= */
-
-function login() {
-
-    const email =
-        document
-            .getElementById("loginEmail")
-            .value
-            .trim()
-            .toLowerCase();
-
-
-    const password =
-        document
-            .getElementById("loginPassword")
-            .value;
-
-
-    if (!email || !password) {
-
-        showToast(
-            "Enter email and password."
-        );
-
-        return;
-
-    }
-
-
-    const account =
-        getAccount();
-
-
-    if (!account) {
-
-        showToast(
-            "No account found. Please sign up first."
-        );
-
-        return;
-
-    }
-
-
-    if (
-        account.email !== email
-    ) {
-
-        showToast(
-            "Email is not registered ❌"
-        );
-
-        return;
-
-    }
-
-
-    if (
-        account.password !== password
-    ) {
-
-        showToast(
-            "Incorrect password ❌"
-        );
-
-        return;
-
-    }
-
-
-    localStorage.setItem(
-        "fz_logged_in",
-        "true"
-    );
-
-
-    player.name =
-        account.name;
-
-    player.email =
-        account.email;
-
-    player.friendId =
-        account.friendId;
-
-
-    loadPlayerStats();
-
-
-    showToast(
-        `Welcome back ${account.name}! 👋`
-    );
-
-
-    setTimeout(
-        enterApp,
-        700
-    );
-
-}
-
-
-/* =========================================
-   GET ACCOUNT
-========================================= */
-
-function getAccount() {
-
-    try {
-
-        return JSON.parse(
-            localStorage.getItem(
-                "fz_account"
-            )
-        );
-
-    } catch {
-
-        return null;
-
-    }
-
-}
-
-
-/* =========================================
-   FORGOT PASSWORD
-========================================= */
-
-function verifyResetEmail() {
-
-    const email =
-        document
-            .getElementById("forgotEmail")
-            .value
-            .trim()
-            .toLowerCase();
-
-
-    if (!email) {
-
-        showToast(
-            "Enter your email 📧"
-        );
-
-        return;
-
-    }
-
-
-    const account =
-        getAccount();
-
-
-    /*
-        IMPORTANT:
-        Only a registered email
-        can continue.
-    */
-
-    if (!account) {
-
-        showToast(
-            "No account exists with this email ❌"
-        );
-
-        return;
-
-    }
-
-
-    if (
-        account.email !== email
-    ) {
-
-        showToast(
-            "This email is not registered ❌"
-        );
-
-        return;
-
-    }
-
-
-    /*
-        Email is verified for this
-        prototype.
-    */
-
-    document
-        .getElementById("forgotStep1")
-        .classList.add("hidden");
-
-
-    document
-        .getElementById("forgotStep2")
-        .classList.remove("hidden");
-
-
-    document
-        .getElementById("newPassword")
-        .value = "";
-
-
-    document
-        .getElementById("confirmPassword")
-        .value = "";
-
-
-    updateResetPasswordRules();
-
-
-    showToast(
-        "Email verified! ✅"
-    );
-
-}
-
-
-/* =========================================
-   RESET PASSWORD
-========================================= */
-
-function resetPassword() {
-
-    const newPassword =
-        document
-            .getElementById("newPassword")
-            .value;
-
-
-    const confirmPassword =
-        document
-            .getElementById("confirmPassword")
-            .value;
-
-
-    const rules =
-        validatePassword(
-            newPassword
-        );
-
-
-    if (!rules.valid) {
-
-        showToast(
-            "Password doesn't meet the requirements ❌"
-        );
-
-        return;
-
-    }
-
-
-    if (
-        newPassword !==
-        confirmPassword
-    ) {
-
-        showToast(
-            "Passwords don't match ❌"
-        );
-
-        return;
-
-    }
-
-
-    const account =
-        getAccount();
-
-
-    if (!account) {
-
-        showToast(
-            "Account not found ❌"
-        );
-
-        return;
-
-    }
-
-
-    /*
-        Update password.
-    */
-
-    account.password =
-        newPassword;
-
-
-    localStorage.setItem(
-        "fz_account",
-        JSON.stringify(account)
-    );
-
-
-    showToast(
-        "Password renewed successfully! 🎉"
-    );
-
-
-    document
-        .getElementById("newPassword")
-        .value = "";
-
-
-    document
-        .getElementById("confirmPassword")
-        .value = "";
-
-
-    setTimeout(
-        showLogin,
-        1000
-    );
-
-}
-
-
-/* =========================================
-   ENTER APP
-========================================= */
-
-function enterApp() {
-
-    document
-        .getElementById("authScreen")
-        .classList.add("hidden");
-
-
-    document
-        .getElementById("mainApp")
-        .classList.remove("hidden");
-
-
-    loadPlayerStats();
-
-    loadFriendSystem();
-
-    updateStats();
-
-    updateProfile();
-
-    showHome();
-
-}
-
-
-/* =========================================
-   PLAYER STATS
-========================================= */
-
-function savePlayerStats() {
-
-    localStorage.setItem(
-        "fz_player_stats",
-        JSON.stringify({
-
-            games:
-                player.games,
-
-            score:
-                player.score,
-
-            wins:
-                player.wins
-
-        })
-    );
-
-}
-
-
-function loadPlayerStats() {
-
-    const saved =
-        JSON.parse(
-            localStorage.getItem(
-                "fz_player_stats"
-            )
-        );
-
-
-    if (!saved) return;
-
-
-    player.games =
-        Number(saved.games) || 0;
-
-    player.score =
-        Number(saved.score) || 0;
-
-    player.wins =
-        Number(saved.wins) || 0;
-
-}
-
-
-/* =========================================
-   UPDATE STATS
-========================================= */
-
-function updateStats() {
-
-    const games =
-        document.getElementById(
-            "gamesPlayed"
-        );
-
-    const score =
-        document.getElementById(
-            "totalScore"
-        );
-
-    const wins =
-        document.getElementById(
-            "wins"
-        );
-
-    const rankName =
-        document.getElementById(
-            "rank1Name"
-        );
-
-    const rankScore =
-        document.getElementById(
-            "rank1Score"
-        );
-
-
-    if (games)
-        games.textContent =
-            player.games;
-
-
-    if (score)
-        score.textContent =
-            player.score;
-
-
-    if (wins)
-        wins.textContent =
-            player.wins;
-
-
-    if (rankName)
-        rankName.textContent =
-            player.name || "You";
-
-
-    if (rankScore)
-        rankScore.textContent =
-            player.score;
-
-}
-
-
-/* =========================================
-   NAVIGATION
-========================================= */
-
-const pages = [
-
-    "homePage",
-
-    "gamesPage",
-
-    "bestFriendsPage",
-
-    "leaderboardPage",
-
-    "gamePage"
-
-];
-
-
-function hidePages() {
-
-    pages.forEach(
-        id => {
-
-            const page =
-                document.getElementById(id);
-
-            if (page) {
-
-                page.classList.remove(
-                    "active"
-                );
-
-            }
-
-        }
-    );
-
-}
-
-
-function showPage(id) {
-
-    hidePages();
-
-
-    const page =
-        document.getElementById(id);
-
-
-    if (!page) return;
-
-
-    page.classList.add(
-        "active"
-    );
-
-
-    window.scrollTo({
-
-        top: 0,
-
-        behavior: "smooth"
-
-    });
-
-}
-
-
-function showHome() {
-
-    showPage(
-        "homePage"
-    );
-
-}
-
-
-function showGames() {
-
-    showPage(
-        "gamesPage"
-    );
-
-}
-
-
-function showBestFriends() {
-
-    showPage(
-        "bestFriendsPage"
-    );
-
-    renderFriendSystem();
-
-}
-
-
-function showLeaderboard() {
-
-    showPage(
-        "leaderboardPage"
-    );
-
-    updateStats();
-
-}
-
-
-/* =========================================
-   PROFILE
-========================================= */
-
-function updateProfile() {
-
-    const account =
-        getAccount();
-
-
-    if (!account) return;
-
-
-    const name =
-        document.getElementById(
-            "profileName"
-        );
-
-
-    const id =
-        document.getElementById(
-            "profileFriendId"
-        );
-
-
-    const myId =
-        document.getElementById(
-            "myFriendId"
-        );
-
-
-    if (name)
-        name.textContent =
-            account.name;
-
-
-    if (id)
-        id.textContent =
-            account.friendId;
-
-
-    if (myId)
-        myId.textContent =
-            account.friendId;
-
-}
-
-
-function openProfile() {
-
-    updateProfile();
-
-
-    document
-        .getElementById(
-            "profileModal"
-        )
-        .classList.add(
-            "show"
-        );
-
-}
-
-
-function closeProfile() {
-
-    document
-        .getElementById(
-            "profileModal"
-        )
-        .classList.remove(
-            "show"
-        );
-
-}
-
-
-/* =========================================
-   LOGOUT
-========================================= */
-
-function logout() {
-
-    localStorage.removeItem(
-        "fz_logged_in"
-    );
-
-
-    closeProfile();
-
-
-    document
-        .getElementById(
-            "mainApp"
-        )
-        .classList.add(
-            "hidden"
-        );
-
-
-    document
-        .getElementById(
-            "authScreen"
-        )
-        .classList.remove(
-            "hidden"
-        );
-
-
-    showLogin();
-
-
-    showToast(
-        "Signed out successfully 👋"
-    );
-
-}
-
-
-/* =========================================
-   FRIEND ID COPY
-========================================= */
-
-function copyFriendId() {
-
-    const account =
-        getAccount();
-
-
-    if (!account) return;
-
-
-    if (
-        navigator.clipboard
-    ) {
-
-        navigator.clipboard.writeText(
-            account.friendId
-        );
-
-    }
-
-
-    showToast(
-        "Friend ID copied! 📋"
-    );
-
-}
-
-
-/* =========================================
-   BEST FRIEND SYSTEM
-========================================= */
-
-function loadFriendSystem() {
-
-    try {
-
-        bestFriends =
-            JSON.parse(
-                localStorage.getItem(
-                    "fz_best_friends"
-                )
-            ) || [];
-
-
-        friendRequests =
-            JSON.parse(
-                localStorage.getItem(
-                    "fz_friend_requests"
-                )
-            ) || [];
-
-    } catch {
-
-        bestFriends = [];
-
-        friendRequests = [];
-
-    }
-
-}
-
-
-function saveFriendSystem() {
-
-    localStorage.setItem(
-        "fz_best_friends",
-        JSON.stringify(
-            bestFriends
-        )
-    );
-
-
-    localStorage.setItem(
-        "fz_friend_requests",
-        JSON.stringify(
-            friendRequests
-        )
-    );
-
-}
-
-
-/* =========================================
-   SEND REQUEST
-========================================= */
-
-function sendBestFriendRequest() {
-
-    const input =
-        document.getElementById(
-            "friendIdInput"
-        );
-
-
-    const friendId =
-        input.value
-            .trim()
-            .toUpperCase();
-
-
-    if (!friendId) {
-
-        showToast(
-            "Enter a Friend ID."
-        );
-
-        return;
-
-    }
-
-
-    const account =
-        getAccount();
-
-
-    if (!account) {
-
-        showToast(
-            "Please sign in first."
-        );
-
-        return;
-
-    }
-
-
-    if (
-        friendId ===
-        account.friendId
-    ) {
-
-        showToast(
-            "You can't add yourself 😂"
-        );
-
-        return;
-
-    }
-
-
-    /*
-        FRONTEND PROTOTYPE:
-        Since there is no backend yet,
-        this creates a pending request
-        locally.
-
-        Supabase will later replace this
-        with a real cross-device request.
-    */
-
-    const alreadySent =
-        friendRequests.some(
-            request =>
-                request.to === friendId
-        );
-
-
-    if (alreadySent) {
-
-        showToast(
-            "Request already sent 📩"
-        );
-
-        return;
-
-    }
-
-
-    friendRequests.push({
-
-        id:
-            Date.now(),
-
-        from:
-            account.friendId,
-
-        fromName:
-            account.name,
-
-        to:
-            friendId,
-
-        status:
-            "pending"
-
-    });
-
-
-    saveFriendSystem();
-
-
-    input.value = "";
-
-
-    renderFriendSystem();
-
-
-    showToast(
-        "Best Friend request sent ❤️"
-    );
-
-}
-
-
-/* =========================================
-   ACCEPT REQUEST
-========================================= */
-
-function acceptFriendRequest(id) {
-
-    const request =
-        friendRequests.find(
-            item =>
-                item.id === id
-        );
-
-
-    if (!request) return;
-
-
-    request.status =
-        "accepted";
-
-
-    bestFriends.push({
-
-        friendId:
-            request.from,
-
-        name:
-            request.fromName
-
-    });
-
-
-    saveFriendSystem();
-
-
-    renderFriendSystem();
-
-
-    showToast(
-        "You are now Best Friends! ❤️🎉"
-    );
-
-}
-
-
-/* =========================================
-   REJECT REQUEST
-========================================= */
-
-function rejectFriendRequest(id) {
-
-    friendRequests =
-        friendRequests.filter(
-            request =>
-                request.id !== id
-        );
-
-
-    saveFriendSystem();
-
-
-    renderFriendSystem();
-
-
-    showToast(
-        "Request rejected."
-    );
-
-}
-
-
-/* =========================================
-   RENDER FRIEND SYSTEM
-========================================= */
-
-function renderFriendSystem() {
-
-    renderRequests();
-
-    renderBestFriends();
-
-    renderBestFriendPreview();
-
-}
-
-
-/* =========================================
-   RENDER REQUESTS
-========================================= */
-
-function renderRequests() {
-
-    const container =
-        document.getElementById(
-            "friendRequests"
-        );
-
-
-    if (!container) return;
-
-
-    const pending =
-        friendRequests.filter(
-            request =>
-                request.status ===
-                "pending"
-        );
-
-
-    if (!pending.length) {
-
-        container.className =
-            "empty-state";
-
-
-        container.innerHTML = `
-
-            <div>
-                📭
-            </div>
-
-            <h3>
-                No requests
-            </h3>
-
-            <p>
-                When someone sends you a
-                Best Friend request, it will
-                appear here.
-            </p>
-
-        `;
-
-        return;
-
-    }
-
-
-    container.className =
-        "request-list";
-
-
-    container.innerHTML = "";
-
-
-    pending.forEach(
-        request => {
-
-            const item =
-                document.createElement(
-                    "div"
-                );
-
-
-            item.className =
-                "friend-request";
-
-
-            item.innerHTML = `
-
-                <div class="request-user">
-
-                    <div class="mini-avatar">
-                        ❤️
-                    </div>
-
-                    <div>
-
-                        <strong>
-                            ${escapeHTML(
-                                request.fromName
-                            )}
-                        </strong>
-
-                        <small>
-                            Friend request
-                        </small>
-
-                    </div>
-
-                </div>
-
-
-                <div class="request-actions">
-
-                    <button
-                        class="accept-button"
-                        onclick="acceptFriendRequest(${request.id})"
-                    >
-                        ✓ Accept
-                    </button>
-
-                    <button
-                        class="reject-button"
-                        onclick="rejectFriendRequest(${request.id})"
-                    >
-                        ✕
-                    </button>
-
-                </div>
-
-            `;
-
-
-            container.appendChild(
-                item
-            );
-
-        }
-    );
-
-}
-
-
-/* =========================================
-   RENDER BEST FRIENDS
-========================================= */
-
-function renderBestFriends() {
-
-    const container =
-        document.getElementById(
-            "bestFriendsList"
-        );
-
-
-    if (!container) return;
-
-
-    if (!bestFriends.length) {
-
-        container.className =
-            "empty-state";
-
-
-        container.innerHTML = `
-
-            <div>
-                ❤️
-            </div>
-
-            <h3>
-                No Best Friends yet
-            </h3>
-
-            <p>
-                Send a request to someone
-                and wait for them to accept.
-            </p>
-
-        `;
-
-        return;
-
-    }
-
-
-    container.className =
-        "best-friends-list";
-
-
-    container.innerHTML = "";
-
-
-    bestFriends.forEach(
-        friend => {
-
-            const card =
-                document.createElement(
-                    "div"
-                );
-
-
-            card.className =
-                "best-friend-card";
-
-
-            card.innerHTML = `
-
-                <div class="best-avatar">
-                    ❤️
-                </div>
-
-                <div class="best-info">
-
-                    <strong>
-                        ${escapeHTML(
-                            friend.name
-                        )}
-                    </strong>
-
-                    <small>
-                        Best Friend ❤️
-                    </small>
-
-                    <span>
-                        ID: ${escapeHTML(
-                            friend.friendId
-                        )}
-                    </span>
-
-                </div>
-
-            `;
-
-
-            container.appendChild(
-                card
-            );
-
-        }
-    );
-
-}
-
-
-/* =========================================
-   BEST FRIEND HOME PREVIEW
-========================================= */
-
-function renderBestFriendPreview() {
-
-    const container =
-        document.getElementById(
-            "bestFriendsPreview"
-        );
-
-
-    if (!container) return;
-
-
-    if (!bestFriends.length) {
-
-        container.innerHTML = `
-
-            <div>
-
-                ❤️
-
-                <br><br>
-
-                <strong>
-                    Your Best Friend circle is empty.
-                </strong>
-
-                <br>
-
-                <small>
-                    Add someone and wait for them
-                    to accept your request.
-                </small>
-
-            </div>
-
-        `;
-
-        return;
-
-    }
-
-
-    container.innerHTML = "";
-
-
-    bestFriends
-        .slice(0, 4)
-        .forEach(
-            friend => {
-
-                const div =
-                    document.createElement(
-                        "div"
-                    );
-
-
-                div.className =
-                    "preview-friend";
-
-
-                div.innerHTML = `
-
-                    <div class="best-avatar">
-                        ❤️
-                    </div>
-
-                    <strong>
-                        ${escapeHTML(
-                            friend.name
-                        )}
-                    </strong>
-
-                `;
-
-
-                container.appendChild(
-                    div
-                );
-
-            }
-        );
-
-}
-
-
-/* =========================================
-   FRIEND SYSTEM STARTUP
-========================================= */
-
-function initializeFriendSystem() {
-
-    loadFriendSystem();
-
-    renderFriendSystem();
-
-}
-
-
-/* =========================================
-   THOUGHT SYSTEM
-========================================= */
-
-function newThought() {
-
-    const random =
-        thoughts[
-            Math.floor(
-                Math.random() *
-                thoughts.length
-            )
-        ];
-
-
-    document
-        .getElementById(
-            "friendThought"
-        )
-        .textContent =
-        `"${random.text}"`;
-
-
-    document
-        .getElementById(
-            "thoughtAuthor"
-        )
-        .textContent =
-        `— ${random.author}`;
-
-}
-
-
-/* =========================================
-   GAME SYSTEM PLACEHOLDER
-========================================= */
-
-function openGame(game) {
-
-    showPage(
-        "gamePage"
-    );
-
-
-    const container =
-        document.getElementById(
-            "gameContainer"
-        );
-
-
-    const gameNames = {
-
-        tictactoe:
-            "❌⭕ Tic Tac Toe",
-
-        rps:
-            "✊ Rock Paper Scissors",
-
-        reaction:
-            "🎯 Reaction Test",
-
-        memory:
-            "🧠 Memory Master",
-
-        guess:
-            "🔢 Guess Number",
-
-        snake:
-            "🐍 Snake",
-
-        dice:
-            "🎲 Dice Battle",
-
-        roast:
-            "😂 Roast Me",
-
-        friendship:
-            "❤️ Friendship Test",
-
-        future:
-            "🔮 Future Generator"
-
-    };
-
-
-    container.innerHTML = `
-
-        <div>
-
-            <div style="
-                font-size:60px;
-                margin-bottom:20px;
-            ">
-                🎮
-            </div>
-
-            <h2>
-                ${gameNames[game] || "Game"}
-            </h2>
-
-            <p style="
-                color:#9696a7;
-                margin-top:10px;
-            ">
-                This game will be added next.
-            </p>
-
-            <button
-                class="primary-button"
-                style="margin-top:20px"
-                onclick="showGames()"
-            >
-                ← Back to Games
-            </button>
-
-        </div>
-
-    `;
-
-}
-
-
-/* =========================================
-   HTML ESCAPE
-========================================= */
-
-function escapeHTML(value) {
-
-    return String(value)
-
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-
-        .replace(
-            /</g,
-            "&lt;"
-        )
-
-        .replace(
-            />/g,
-            "&gt;"
-        )
-
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-
-        .replace(
-            /'/g,
-            "&#039;"
-        );
-
-}
-
-
-/* =========================================
-   TOAST
-========================================= */
-
-function showToast(message) {
-
-    const toast =
-        document.getElementById(
-            "toast"
-        );
-
-
-    if (!toast) return;
-
-
-    toast.textContent =
-        message;
-
-
-    toast.classList.add(
-        "show"
-    );
-
-
-    clearTimeout(
-        window.toastTimer
-    );
-
-
-    window.toastTimer =
-        setTimeout(
-            () => {
-
-                toast.classList.remove(
-                    "show"
-                );
-
-            },
-            2500
-        );
-
-}
-
-
-/* =========================================
-   PASSWORD LIVE LISTENERS
-========================================= */
-
-document.addEventListener(
-    "input",
+$("#modal")
+  .addEventListener(
+    "click",
     event => {
 
-        if (
-            event.target.id ===
-            "signupPassword"
-        ) {
-
-            updateSignupPasswordRules();
-
-        }
-
-
-        if (
-            event.target.id ===
-            "newPassword"
-        ) {
-
-            updateResetPasswordRules();
-
-        }
+      if(
+        event.target.id === "modal"
+      ){
+        closeModal();
+      }
 
     }
-);
+  );
 
 
-/* =========================================
-   STARTUP
-========================================= */
+$$("[data-page]")
+  .forEach(
+    button => {
 
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-
-        generateCaptcha();
-
-
-        const loggedIn =
-            localStorage.getItem(
-                "fz_logged_in"
-            );
-
-
-        if (loggedIn === "true") {
-
-            const account =
-                getAccount();
-
-
-            if (account) {
-
-                player.name =
-                    account.name;
-
-                player.email =
-                    account.email;
-
-                player.friendId =
-                    account.friendId;
-
-
-                loadPlayerStats();
-
-                enterApp();
-
-                return;
-
-            }
-
-        }
-
-
-        document
-            .getElementById(
-                "authScreen"
-            )
-            .classList.remove(
-                "hidden"
-            );
-
-
-        document
-            .getElementById(
-                "mainApp"
-            )
-            .classList.add(
-                "hidden"
-            );
-
-
-        newThought();
+      button.addEventListener(
+        "click",
+        () => showPage(
+          button.dataset.page
+        )
+      );
 
     }
-);
+  );
+
+
+$("#newThought")
+  .onclick = () => {
+
+    thoughtIndex =
+      (thoughtIndex + 1)
+      % thoughts.length;
+
+    $("#thought")
+      .textContent =
+      thoughts[thoughtIndex];
+
+  };
+
+
+$("#copyId")
+  .onclick =
+  async () => {
+
+    try{
+
+      await navigator.clipboard
+        .writeText(user.id);
+
+      toast(
+        "Friend ID copied!"
+      );
+
+    }catch{
+
+      toast(user.id);
+
+    }
+
+  };
+
+
+$("#sendRequest")
+  .onclick =
+  sendFriendRequest;
+
+
+$("#profileBtn")
+  .onclick =
+  openProfile;
+
+
+$("#createRoom")
+  .onclick =
+  createRoom;
+
+
+$("#createRoom2")
+  .onclick =
+  createRoom;
+
+
+$("#quickMatch")
+  .onclick =
+  () => {
+
+    openModal(`
+
+      <p class="eyebrow">
+        MATCHMAKING
+      </p>
+
+      <h2>
+        ⚡ Finding Opponent...
+      </h2>
+
+      <p class="muted">
+        Searching for an available player.
+      </p>
+
+      <button
+        class="secondary full"
+        onclick="toast('Searching...')"
+      >
+        Keep Searching
+      </button>
+
+    `);
+
+  };
+
+
+$("#tournament")
+  .onclick =
+  () => {
+
+    openModal(`
+
+      <p class="eyebrow">
+        TOURNAMENT
+      </p>
+
+      <h2>
+        🏆 Weekly Cup
+      </h2>
+
+      <p class="muted">
+        Tournament system is ready for
+        the realtime backend.
+      </p>
+
+      <button
+        class="primary full"
+        onclick="toast('Tournament coming soon!')"
+      >
+        Join Tournament
+      </button>
+
+    `);
+
+  };
+
+
+renderGames("#quickGames");
+
+renderGames("#allGames");
+
+setupAuth();
+
+
+if(user){
+
+  enterApp();
+
+}
