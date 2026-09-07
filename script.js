@@ -1,274 +1,1839 @@
-const $ = (s) => document.querySelector(s),
-  $$ = (s) => document.querySelectorAll(s);
-const G = [
-  ["🎯", "Tic Tac Toe", "1v1 • Room", "purple"],
-  ["✊", "Rock Paper Scissors", "1v1 • Random", "red"],
-  ["⚡", "Reaction Rush", "Solo • Score", "green"],
-  ["🧠", "Memory Clash", "1v1 • Room", "blue"],
-  ["🔢", "Guess Number", "1v1 • Random", "orange"],
-  ["🐍", "Snake", "Solo • Score", "green"],
-  ["🎲", "Dice Battle", "Multiplayer", "gold"],
-  ["🔥", "Roast Me", "Party", "pink"],
-  ["❤️", "Friendship Test", "Friends", "pink"],
-  ["🔮", "Future Generator", "Party", "violet"],
-  ["🧩", "Connect 4", "1v1 • Room", "blue"],
-  ["❓", "Quiz Battle", "Multiplayer", "purple"],
-];
-const thoughts = [
-  "Bro said “one game” 47 minutes ago.",
-  "Your friend is online. Your productivity is offline.",
-  "If losing was a skill, your squad would be professional.",
-  "One more match. Famous last words.",
-  "Best friends are basically free teammates.",
-];
-let capA,
-  capB,
-  user = JSON.parse(localStorage.fzUser || "null"),
-  xp = +localStorage.fzXp || 0,
-  friends = JSON.parse(localStorage.fzFriends || "[]"),
-  best = JSON.parse(localStorage.fzBest || "[]"),
-  requests = JSON.parse(localStorage.fzReq || "[]");
-function toast(x) {
-  let t = $("#toast");
-  t.textContent = x;
-  t.classList.add("show");
-  clearTimeout(window.to);
-  window.to = setTimeout(() => t.classList.remove("show"), 2200);
-}
-function pass(p) {
-  return p.length >= 8 && /[A-Z]/.test(p) && /[0-9]/.test(p);
-}
-function captcha() {
-  capA = 1 + Math.floor(Math.random() * 8);
-  capB = 1 + Math.floor(Math.random() * 8);
-  $("#cap").textContent = `${capA} + ${capB} = ?`;
-}
-function games(el) {
-  $(el).innerHTML = G.map(
-    (g, i) =>
-      `<article class="game ${g[3]}"><i>${g[0]}</i><h4>${g[1]}</h4><p>${g[2]}</p><button onclick="launch(${i})">→</button></article>`
-  ).join("");
-}
-function launch(i) {
-  xp += 10;
-  localStorage.fzXp = xp;
-  $("#xp").textContent = xp;
-  $("#meter").style.width = (xp % 101) + "%";
-  open(
-    `<small class="eyebrow">GAME LOBBY</small><h2>${G[i][0]} ${G[i][1]}</h2><p>How do you want to play?</p><div class="twocol"><button class="primary" onclick="toast('Finding opponent…')">⚡ Random Match</button><button class="secondary" onclick="toast('Room created — invite your friends!')">🏠 Create Room</button></div><p class="muted">The live multiplayer engine will be connected in the backend phase.</p>`
-  );
-}
-function open(html) {
-  $("#mb").innerHTML = html;
-  $("#modal").classList.remove("hide");
-}
-function page(p) {
-  $$(".page").forEach((x) => x.classList.remove("active"));
-  $("#" + p).classList.add("active");
-  $$("[data-page]").forEach((x) =>
-    x.classList.toggle("active", x.dataset.page === p)
-  );
-  scrollTo(0, 0);
-}
-function id() {
-  return "FZ-" + Math.floor(100000 + Math.random() * 900000);
-}
-function save() {
-  localStorage.fzFriends = JSON.stringify(friends);
-  localStorage.fzBest = JSON.stringify(best);
-  localStorage.fzReq = JSON.stringify(requests);
-}
-function esc(x) {
-  return String(x).replace(
-    /[&<>"']/g,
-    (m) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[
-        m
-      ])
-  );
-}
-function render() {
-  let f = $("#fl");
-  $("#fc").textContent = friends.length;
-  f.innerHTML = friends.length
-    ? friends
-        .map(
-          (x, i) =>
-            `<div class="friend"><span class="avatar">${x.name[0].toUpperCase()}</span><div class="grow"><b>${esc( x.name )}</b><small>${ x.id }</small></div><div class="mini"><button class="secondary" onclick="bestToggle(${i})">${ best.includes(x.id) ? "❤️" : "♡" }</button><button class="secondary" onclick="toast('Chat is available after the realtime backend is connected.')">💬</button></div></div>`
-        )
-        .join("")
-    : '<p class="muted">No friends yet. Add someone using their Friend ID.</p>';
-  $("#bl").innerHTML = best.length
-    ? best
-        .map((i) => {
-          let x = friends.find((y) => y.id === i);
-          return x
-            ? `<div class="friend"><span class="avatar">❤️</span><div class="grow"><b>${esc( x.name )}</b><small>Best Friend • ${ x.id }</small></div><button class="secondary" onclick="bestRemove('${ x.id }')">Remove</button></div>`
-            : "";
-        })
-        .join("")
-    : '<p class="muted">Choose ❤️ beside an accepted friend.</p>';
-  $("#rq").innerHTML = requests.length
-    ? requests
-        .map(
-          (x, i) =>
-            `<div class="friend"><span class="avatar">${x.name[0].toUpperCase()}</span><div class="grow"><b>${esc( x.name )}</b><small>${ x.id }</small></div><div class="mini"><button class="primary" onclick="accept(${i})">Accept</button><button class="secondary" onclick="reject(${i})">Reject</button></div></div>`
-        )
-        .join("")
-    : '<p class="muted">No pending requests.</p>';
-}
-function bestToggle(i) {
-  let id = friends[i].id;
-  best = best.includes(id) ? best.filter((x) => x !== id) : [...best, id];
-  save();
-  render();
-  toast(
-    best.includes(id) ? "Added to Best Friends ❤️" : "Removed from Best Friends"
-  );
-}
-function bestRemove(id) {
-  best = best.filter((x) => x !== id);
-  save();
-  render();
-}
-$("#send").onclick = () => {
-  let v = $("#addid").value.trim().toUpperCase();
-  if (!/^FZ-\d{6}$/.test(v)) return toast("Enter a valid Friend ID");
-  if (v === user.id) return toast("You cannot add yourself");
-  if (friends.some((x) => x.id === v)) return toast("Already your friend");
-  toast("Friend request created. Live delivery needs the backend.");
-  $("#addid").value = "";
-};
-function accept(i) {
-  let r = requests[i];
-  friends.push(r);
-  requests.splice(i, 1);
-  save();
-  render();
-  toast(r.name + " is now your friend!");
-}
-function reject(i) {
-  requests.splice(i, 1);
-  save();
-  render();
-  toast("Request rejected");
-}
-$("#copy").onclick = () =>
-  navigator.clipboard
-    ?.writeText(user.id)
-    .then(() => toast("Friend ID copied"))
-    .catch(() => toast(user.id));
-function enter() {
-  if (!user) return;
-  $("#auth").classList.add("hide");
-  $("#app").classList.remove("hide");
-  $("#hello").textContent = user.name.toUpperCase();
-  $("#fid").textContent = user.id;
-  $("#profile").textContent = user.name[0].toUpperCase();
-  $("#xp").textContent = xp;
-  $("#meter").style.width = (xp % 101) + "%";
-  render();
-}
-function setupAuth() {
-  captcha();
-  $$(".tabs button").forEach(
-    (b) =>
-      (b.onclick = () => {
-        $$(".tabs button").forEach((x) => x.classList.remove("active"));
-        b.classList.add("active");
-        $("#loginForm").classList.toggle("hide", b.dataset.auth !== "login");
-        $("#signupForm").classList.toggle("hide", b.dataset.auth !== "signup");
-        $("#forgotForm").classList.add("hide");
-      })
-  );
-  $("#sp").oninput = (e) => {
-    let p = e.target.value;
-    $("#rl").textContent = (p.length >= 8 ? "✓" : "○") + " 8+ chars";
-    $("#rc").textContent = (/[A-Z]/.test(p) ? "✓" : "○") + " 1 capital";
-    $("#rn").textContent = (/[0-9]/.test(p) ? "✓" : "○") + " 1 number";
+/* =====================================================
+   FRIENDZONE
+   Main website logic
+===================================================== */
+
+
+/* ================= STATE ================= */
+
+let state = JSON.parse(
+  localStorage.getItem("friendzoneState")
+);
+
+if(!state){
+
+  state = {
+
+    account:null,
+
+    loggedIn:false,
+
+    friends:[],
+
+    requests:[],
+
+    bestFriends:[],
+
+    messages:{},
+
+    rooms:[],
+
+    score:0
+
   };
-  $("#signupForm").onsubmit = (e) => {
-    e.preventDefault();
-    let p = $("#sp").value;
-    if (!pass(p))
-      return toast("Password needs 8+ chars, 1 capital and 1 number");
-    if (+$("#ca").value !== capA + capB) return toast("Wrong CAPTCHA");
-    user = {
-      name: $("#sn").value.trim(),
-      email: $("#se").value.trim().toLowerCase(),
-      password: p,
-      id: id(),
-    };
-    localStorage.fzUser = JSON.stringify(user);
-    localStorage.fzAccount = JSON.stringify(user);
-    enter();
-    toast("Welcome to FriendZone!");
-  };
-  $("#loginForm").onsubmit = (e) => {
-    e.preventDefault();
-    let a = JSON.parse(localStorage.fzAccount || "null");
-    if (
-      !a ||
-      a.email !== $("#le").value.trim().toLowerCase() ||
-      a.password !== $("#lp").value
+
+}
+
+let captchaA = 0;
+let captchaB = 0;
+
+let currentChat = null;
+let currentGame = null;
+
+
+/* ================= GAMES ================= */
+
+const games = [
+
+  {
+    id:"tictactoe",
+    name:"Tic Tac Toe",
+    icon:"⭕",
+    description:"Classic 1v1 strategy game.",
+    players:"2 Players"
+  },
+
+  {
+    id:"rps",
+    name:"Rock Paper Scissors",
+    icon:"✊",
+    description:"Fast 1v1 battle.",
+    players:"2 Players"
+  },
+
+  {
+    id:"quiz",
+    name:"Quick Quiz",
+    icon:"🧠",
+    description:"Answer quickly and score points.",
+    players:"2+ Players"
+  },
+
+  {
+    id:"memory",
+    name:"Memory Match",
+    icon:"🃏",
+    description:"Test your memory and speed.",
+    players:"1–2 Players"
+  },
+
+  {
+    id:"dots",
+    name:"Dots Battle",
+    icon:"🔵",
+    description:"Capture more space than your opponent.",
+    players:"2 Players"
+  },
+
+  {
+    id:"reaction",
+    name:"Reaction Rush",
+    icon:"⚡",
+    description:"React faster than your opponent.",
+    players:"1–2 Players"
+  }
+
+];
+
+
+/* ================= HELPERS ================= */
+
+function $(id){
+  return document.getElementById(id);
+}
+
+
+function save(){
+
+  localStorage.setItem(
+    "friendzoneState",
+    JSON.stringify(state)
+  );
+
+}
+
+
+function toast(message){
+
+  const box = $("toast");
+
+  box.textContent = message;
+
+  box.classList.add("show");
+
+  setTimeout(()=>{
+    box.classList.remove("show");
+  },2200);
+
+}
+
+
+/* ================= AUTH ================= */
+
+function showAuth(type){
+
+  $("loginBox").classList.add("hidden");
+  $("signupBox").classList.add("hidden");
+  $("forgotBox").classList.add("hidden");
+  $("resetBox").classList.add("hidden");
+
+  $("loginTab").classList.remove("active");
+  $("signupTab").classList.remove("active");
+
+
+  if(type==="login"){
+
+    $("loginBox").classList.remove("hidden");
+    $("loginTab").classList.add("active");
+
+  }
+
+
+  if(type==="signup"){
+
+    $("signupBox").classList.remove("hidden");
+    $("signupTab").classList.add("active");
+
+  }
+
+
+  if(type==="forgot"){
+
+    $("forgotBox").classList.remove("hidden");
+
+  }
+
+}
+
+
+function validPassword(password){
+
+  return (
+
+    password.length >= 8 &&
+
+    /[A-Z]/.test(password) &&
+
+    /[0-9]/.test(password)
+
+  );
+
+}
+
+
+function checkPassword(inputID,rulesID){
+
+  const password = $(inputID).value;
+
+  $(rulesID).innerHTML = `
+
+    <span class="rule ${password.length>=8?"ok":""}">
+      8+ Characters
+    </span>
+
+    <span class="rule ${/[A-Z]/.test(password)?"ok":""}">
+      Capital Letter
+    </span>
+
+    <span class="rule ${/[0-9]/.test(password)?"ok":""}">
+      Number
+    </span>
+
+  `;
+
+}
+
+
+/* CAPTCHA */
+
+function createCaptcha(){
+
+  captchaA =
+    Math.floor(Math.random()*9)+1;
+
+  captchaB =
+    Math.floor(Math.random()*9)+1;
+
+  $("captchaQuestion").textContent =
+    `${captchaA} + ${captchaB} = ?`;
+
+  $("captchaAnswer").value = "";
+
+}
+
+
+/* FRIEND ID */
+
+function generateFriendID(){
+
+  return (
+    "FZ-" +
+    Math.floor(
+      100000 +
+      Math.random()*900000
     )
-      return toast("Invalid email or password");
-    user = a;
-    localStorage.fzUser = JSON.stringify(user);
-    enter();
-  };
-  $("#forgot").onclick = () => {
-    $("#loginForm").classList.add("hide");
-    $("#signupForm").classList.add("hide");
-    $("#forgotForm").classList.remove("hide");
-  };
-  $("#back").onclick = () => {
-    $("#forgotForm").classList.add("hide");
-    $("#loginForm").classList.remove("hide");
-  };
-  $("#forgotForm").onsubmit = (e) => {
-    e.preventDefault();
-    let a = JSON.parse(localStorage.fzAccount || "null");
-    if (!a || a.email !== $("#fe").value.trim().toLowerCase())
-      return toast("That email is not registered");
-    open(
-      `<small class="eyebrow">VERIFIED</small><h2>Renew password</h2><label>New password<input id="np" type="password" placeholder="8+ characters"></label><br><button class="primary" style="width:100%" onclick="renew()">Renew password</button>`
-    );
-  };
+  );
+
 }
-window.renew = () => {
-  let p = $("#np").value;
-  if (!pass(p)) return toast("Password needs 8+ chars, 1 capital and 1 number");
-  let a = JSON.parse(localStorage.fzAccount);
-  a.password = p;
-  localStorage.fzAccount = JSON.stringify(a);
-  $("#modal").classList.add("hide");
+
+
+/* SIGNUP */
+
+function signup(){
+
+  const name =
+    $("signupName").value.trim();
+
+  const email =
+    $("signupEmail").value
+    .trim()
+    .toLowerCase();
+
+  const password =
+    $("signupPassword").value;
+
+  const answer =
+    Number(
+      $("captchaAnswer").value
+    );
+
+
+  if(!name || !email || !password){
+
+    toast("Please fill all fields.");
+
+    return;
+
+  }
+
+
+  if(!validPassword(password)){
+
+    toast(
+      "Password needs 8+ characters, capital letter and number."
+    );
+
+    return;
+
+  }
+
+
+  if(answer !== captchaA + captchaB){
+
+    toast("Wrong CAPTCHA.");
+
+    createCaptcha();
+
+    return;
+
+  }
+
+
+  if(state.account &&
+     state.account.email === email){
+
+    toast("Email is already registered.");
+
+    return;
+
+  }
+
+
+  state.account = {
+
+    name:name,
+
+    email:email,
+
+    password:password,
+
+    friendId:generateFriendID()
+
+  };
+
+
+  state.loggedIn = true;
+
+  save();
+
+  toast("Account created successfully!");
+
+  enterApp();
+
+}
+
+
+/* LOGIN */
+
+function login(){
+
+  const email =
+    $("loginEmail").value
+    .trim()
+    .toLowerCase();
+
+  const password =
+    $("loginPassword").value;
+
+
+  if(
+    !state.account ||
+    state.account.email !== email ||
+    state.account.password !== password
+  ){
+
+    toast("Invalid email or password.");
+
+    return;
+
+  }
+
+
+  state.loggedIn = true;
+
+  save();
+
+  toast("Login successful!");
+
+  enterApp();
+
+}
+
+
+/* FORGOT PASSWORD */
+
+function verifyEmail(){
+
+  const email =
+    $("forgotEmail").value
+    .trim()
+    .toLowerCase();
+
+
+  if(
+    !state.account ||
+    state.account.email !== email
+  ){
+
+    toast("Email not found.");
+
+    return;
+
+  }
+
+
+  $("forgotBox").classList.add("hidden");
+
+  $("resetBox").classList.remove("hidden");
+
+  toast("Email verified.");
+
+}
+
+
+/* RESET PASSWORD */
+
+function resetPassword(){
+
+  const password =
+    $("newPassword").value;
+
+  const confirm =
+    $("confirmPassword").value;
+
+
+  if(!validPassword(password)){
+
+    toast(
+      "Password needs 8+ characters, capital letter and number."
+    );
+
+    return;
+
+  }
+
+
+  if(password !== confirm){
+
+    toast("Passwords do not match.");
+
+    return;
+
+  }
+
+
+  state.account.password = password;
+
+  save();
+
+
+  $("resetBox").classList.add("hidden");
+
+  $("loginBox").classList.remove("hidden");
+
+  $("loginTab").classList.add("active");
+
   toast("Password renewed. Login now.");
-};
-$$("[data-page]").forEach((b) => (b.onclick = () => page(b.dataset.page)));
-$("#profile").onclick = () =>
-  open(
-    `<small class="eyebrow">PROFILE</small><h2>${esc( user.name )}</h2><p>Friend ID: <b>${ user.id }</b></p><p>XP: <b>${xp}</b></p><button class="secondary" style="width:100%" onclick="localStorage.removeItem('fzUser');location.reload()">Log out</button>`
+
+}
+
+
+/* ENTER WEBSITE */
+
+function enterApp(){
+
+  $("authPage")
+    .classList
+    .remove("active");
+
+  $("navbar")
+    .classList
+    .remove("hidden");
+
+  updateUI();
+
+  openPage("home");
+
+}
+
+
+/* LOGOUT */
+
+function logout(){
+
+  state.loggedIn = false;
+
+  save();
+
+  $("navbar")
+    .classList
+    .add("hidden");
+
+  document
+    .querySelectorAll(".page")
+    .forEach(page=>{
+      page.classList.remove("active");
+    });
+
+  $("authPage")
+    .classList
+    .add("active");
+
+  showAuth("login");
+
+  toast("Logged out.");
+
+}
+
+
+/* ================= NAVIGATION ================= */
+
+function openPage(page){
+
+  if(!state.loggedIn){
+
+    return;
+
+  }
+
+
+  document
+    .querySelectorAll(".page")
+    .forEach(p=>{
+      p.classList.remove("active");
+    });
+
+
+  const target =
+    $(page + "Page");
+
+
+  if(target){
+
+    target.classList.add("active");
+
+  }
+
+
+  if(page==="home")
+    renderHome();
+
+  if(page==="friends")
+    renderFriends();
+
+  if(page==="bestfriends")
+    renderBestFriends();
+
+  if(page==="chat")
+    renderChat();
+
+  if(page==="games")
+    renderGames();
+
+  if(page==="rooms")
+    renderRooms();
+
+  if(page==="competitions")
+    renderLeaderboard();
+
+  if(page==="profile")
+    renderProfile();
+
+}
+
+
+/* ================= UI ================= */
+
+function updateUI(){
+
+  if(!state.account)
+    return;
+
+
+  const firstLetter =
+    state.account.name
+    .charAt(0)
+    .toUpperCase();
+
+
+  $("topAvatar").textContent =
+    firstLetter;
+
+  $("topName").textContent =
+    state.account.name
+    .split(" ")[0];
+
+
+  $("homeName").textContent =
+    state.account.name
+    .split(" ")[0];
+
+
+  $("homeFriendID").textContent =
+    state.account.friendId;
+
+
+  $("friendCount").textContent =
+    state.friends.length;
+
+
+  $("bestCount").textContent =
+    state.bestFriends.length;
+
+
+  $("roomCount").textContent =
+    state.rooms.length;
+
+
+  renderHomeGames();
+
+  renderFriends();
+
+  renderBestFriends();
+
+  renderChat();
+
+  renderRooms();
+
+  renderLeaderboard();
+
+  renderProfile();
+
+}
+
+
+/* ================= HOME ================= */
+
+function renderHome(){
+
+  updateUI();
+
+  renderHomeGames();
+
+}
+
+
+function renderHomeGames(){
+
+  const box =
+    $("homeGames");
+
+  if(!box)
+    return;
+
+
+  box.innerHTML =
+    games
+      .slice(0,3)
+      .map(gameCard)
+      .join("");
+
+}
+
+
+/* ================= FRIENDS ================= */
+
+function sendFriendRequest(){
+
+  const id =
+    $("friendIDInput")
+    .value
+    .trim()
+    .toUpperCase();
+
+
+  if(!/^FZ-\d{6}$/.test(id)){
+
+    toast("Enter a valid Friend ID.");
+
+    return;
+
+  }
+
+
+  if(id===state.account.friendId){
+
+    toast("You cannot add yourself.");
+
+    return;
+
+  }
+
+
+  if(
+    state.friends.some(
+      f=>f.friendId===id
+    )
+  ){
+
+    toast("Already your friend.");
+
+    return;
+
+  }
+
+
+  if(
+    state.requests.some(
+      r=>r.friendId===id
+    )
+  ){
+
+    toast("Request already pending.");
+
+    return;
+
+  }
+
+
+  /*
+    Demo frontend:
+    In the real backend version this request
+    will be delivered to the user owning
+    this Friend ID.
+  */
+
+  state.requests.push({
+
+    friendId:id,
+
+    name:"Friend " +
+      id.substring(3),
+
+    incoming:false
+
+  });
+
+
+  save();
+
+  $("friendIDInput").value="";
+
+  toast(
+    "Friend request sent!"
   );
-$("#another").onclick = () =>
-  ($("#thought").textContent =
-    thoughts[Math.floor(Math.random() * thoughts.length)]);
-$("#room").onclick = $("#room2").onclick = () =>
-  open(
-    '<small class="eyebrow">PRIVATE PLAY</small><h2>Create a room 🏠</h2><p>Select a game, then invite accepted friends.</p><select style="width:100%;padding:13px;background:#090b11;color:white;border:1px solid #ffffff12;border-radius:11px">' +
-      G.map((g) => `<option>${g[1]}</option>`).join("") +
-      '</select><br><br><button class="primary" style="width:100%" onclick="toast(\'Room created! Backend will generate the live code.\')">Create room</button>'
+
+  renderFriends();
+
+}
+
+
+function acceptRequest(index){
+
+  const request =
+    state.requests[index];
+
+
+  state.friends.push({
+
+    friendId:request.friendId,
+
+    name:request.name
+
+  });
+
+
+  state.requests.splice(
+    index,
+    1
   );
-$("#match").onclick = () =>
-  open(
-    '<small class="eyebrow">MATCHMAKING</small><h2>Finding opponent… ⚡</h2><p>FriendZone will pair you with an available player.</p><button class="primary" style="width:100%" onclick="toast(\'Searching for players…\')">Keep searching</button>'
+
+
+  save();
+
+  renderFriends();
+
+  updateUI();
+
+  toast(
+    "Friend added successfully!"
   );
-$("#close").onclick = () => $("#modal").classList.add("hide");
-$("#modal").onclick = (e) => {
-  if (e.target.id === "modal") $("#modal").classList.add("hide");
-};
-games("#quick");
-games("#allGames");
-$("#thought").textContent = thoughts[0];
-setupAuth();
-enter();
+
+}
+
+
+function rejectRequest(index){
+
+  state.requests.splice(
+    index,
+    1
+  );
+
+  save();
+
+  renderFriends();
+
+  toast("Request rejected.");
+
+}
+
+
+function removeFriend(id){
+
+  state.friends =
+    state.friends.filter(
+      f=>f.friendId!==id
+    );
+
+
+  state.bestFriends =
+    state.bestFriends.filter(
+      x=>x!==id
+    );
+
+
+  delete state.messages[id];
+
+  save();
+
+  renderFriends();
+
+  renderBestFriends();
+
+  updateUI();
+
+  toast("Friend removed.");
+
+}
+
+
+function makeBestFriend(id){
+
+  if(
+    !state.friends.some(
+      f=>f.friendId===id
+    )
+  ){
+
+    toast(
+      "Only friends can become Best Friends."
+    );
+
+    return;
+
+  }
+
+
+  if(
+    state.bestFriends.includes(id)
+  ){
+
+    state.bestFriends =
+      state.bestFriends.filter(
+        x=>x!==id
+      );
+
+    toast("Removed from Best Friends.");
+
+  }else{
+
+    state.bestFriends.push(id);
+
+    toast("Added to Best Friends 💜");
+
+  }
+
+
+  save();
+
+  renderFriends();
+
+  renderBestFriends();
+
+  updateUI();
+
+}
+
+
+function renderFriends(){
+
+  const box =
+    $("friendsList");
+
+  if(!box)
+    return;
+
+
+  if(state.friends.length===0){
+
+    box.innerHTML = `
+
+      <div class="empty">
+
+        No friends yet.<br>
+
+        Add someone using their Friend ID.
+
+      </div>
+
+    `;
+
+  }else{
+
+    box.innerHTML =
+      state.friends
+      .map(friend=>`
+
+        <div class="friend-card">
+
+          <div class="avatar">
+            ${friend.name.charAt(0)}
+          </div>
+
+          <div class="friend-info">
+
+            <b>
+              ${friend.name}
+            </b>
+
+            <small>
+              ${friend.friendId}
+            </small>
+
+          </div>
+
+
+          <div class="friend-actions">
+
+            <button
+              class="secondary"
+              onclick="startChat('${friend.friendId}')">
+
+              Chat
+
+            </button>
+
+
+            <button
+              class="secondary"
+              onclick="makeBestFriend('${friend.friendId}')">
+
+              ${
+                state.bestFriends.includes(
+                  friend.friendId
+                )
+                ? "💜 Best"
+                : "☆ Best"
+              }
+
+            </button>
+
+
+            <button
+              class="danger"
+              onclick="removeFriend('${friend.friendId}')">
+
+              Remove
+
+            </button>
+
+          </div>
+
+        </div>
+
+      `)
+      .join("");
+
+  }
+
+
+  const requests =
+    $("requestsList");
+
+
+  requests.innerHTML =
+    state.requests.length
+
+    ?
+
+    state.requests
+      .map((request,index)=>`
+
+        <div class="friend-card">
+
+          <div class="avatar">
+            ?
+          </div>
+
+          <div class="friend-info">
+
+            <b>
+              ${request.name}
+            </b>
+
+            <small>
+              ${request.friendId}
+            </small>
+
+          </div>
+
+
+          <div class="friend-actions">
+
+            <button
+              class="primary"
+              onclick="acceptRequest(${index})">
+
+              Accept
+
+            </button>
+
+
+            <button
+              class="danger"
+              onclick="rejectRequest(${index})">
+
+              Reject
+
+            </button>
+
+          </div>
+
+        </div>
+
+      `)
+      .join("")
+
+    :
+
+    `<div class="empty">
+      No friend requests.
+    </div>`;
+
+
+  $("requestCount").textContent =
+    state.requests.length
+    ? `(${state.requests.length})`
+    : "";
+
+}
+
+
+function friendTab(id,button){
+
+  $("friendsList")
+    .classList
+    .toggle(
+      "hidden",
+      id!=="friendsList"
+    );
+
+
+  $("requestsList")
+    .classList
+    .toggle(
+      "hidden",
+      id!=="requestsList"
+    );
+
+
+  document
+    .querySelectorAll(".tabs-small button")
+    .forEach(btn=>{
+      btn.classList.remove("active");
+    });
+
+
+  button.classList.add("active");
+
+}
+
+
+/* ================= BEST FRIENDS ================= */
+
+function renderBestFriends(){
+
+  const box =
+    $("bestFriendsList");
+
+  if(!box)
+    return;
+
+
+  const best =
+    state.friends.filter(
+      friend =>
+        state.bestFriends
+        .includes(friend.friendId)
+    );
+
+
+  if(best.length===0){
+
+    box.innerHTML = `
+
+      <div class="empty">
+
+        Your Best Friends list is empty.<br><br>
+
+        Add someone to Best Friends
+        from your Friends list.
+
+      </div>
+
+    `;
+
+    return;
+
+  }
+
+
+  box.innerHTML =
+    best
+    .map(friend=>`
+
+      <div class="friend-card">
+
+        <div class="avatar">
+          💜
+        </div>
+
+        <div class="friend-info">
+
+          <b>
+            ${friend.name}
+          </b>
+
+          <small>
+            ${friend.friendId}
+          </small>
+
+        </div>
+
+
+        <button
+          class="secondary"
+          onclick="startChat('${friend.friendId}')">
+
+          Chat
+
+        </button>
+
+
+        <button
+          class="danger"
+          onclick="makeBestFriend('${friend.friendId}')">
+
+          Remove Best
+
+        </button>
+
+      </div>
+
+    `)
+    .join("");
+
+}
+
+
+/* ================= CHAT ================= */
+
+function renderChat(){
+
+  const box =
+    $("chatFriends");
+
+  if(!box)
+    return;
+
+
+  if(state.friends.length===0){
+
+    box.innerHTML =
+      `<div class="empty">
+        Add friends first.
+      </div>`;
+
+    return;
+
+  }
+
+
+  box.innerHTML =
+    state.friends
+    .map(friend=>`
+
+      <div
+        class="chat-person ${
+          currentChat===friend.friendId
+          ? "active"
+          : ""
+        }"
+        onclick="startChat('${friend.friendId}')">
+
+        <div class="avatar">
+          ${friend.name.charAt(0)}
+        </div>
+
+        <b>
+          ${friend.name}
+        </b>
+
+      </div>
+
+    `)
+    .join("");
+
+
+  if(currentChat){
+
+    renderMessages();
+
+  }
+
+}
+
+
+function startChat(id){
+
+  if(
+    !state.friends.some(
+      friend =>
+        friend.friendId===id
+    )
+  ){
+
+    toast(
+      "Chat is only available with friends."
+    );
+
+    return;
+
+  }
+
+
+  currentChat=id;
+
+  openPage("chat");
+
+  renderChat();
+
+  renderMessages();
+
+}
+
+
+function renderMessages(){
+
+  const friend =
+    state.friends.find(
+      f=>f.friendId===currentChat
+    );
+
+
+  if(!friend)
+    return;
+
+
+  $("chatHeader").textContent =
+    friend.name;
+
+
+  const list =
+    state.messages[currentChat] || [];
+
+
+  if(list.length===0){
+
+    $("messages").innerHTML =
+      `<div class="empty">
+        No messages yet.<br>
+        Say hello 👋
+      </div>`;
+
+    return;
+
+  }
+
+
+  $("messages").innerHTML =
+    list
+    .map(message=>`
+
+      <div class="bubble ${
+        message.me ? "me" : ""
+      }">
+
+        ${escapeHTML(message.text)}
+
+      </div>
+
+    `)
+    .join("");
+
+
+  $("messages").scrollTop =
+    $("messages").scrollHeight;
+
+}
+
+
+function sendMessage(){
+
+  if(!currentChat){
+
+    toast(
+      "Select a friend first."
+    );
+
+    return;
+
+  }
+
+
+  const input =
+    $("messageInput");
+
+
+  const text =
+    input.value.trim();
+
+
+  if(!text)
+    return;
+
+
+  if(!state.messages[currentChat]){
+
+    state.messages[currentChat]=[];
+
+  }
+
+
+  state.messages[currentChat].push({
+
+    text:text,
+
+    me:true
+
+  });
+
+
+  input.value="";
+
+  save();
+
+  renderMessages();
+
+}
+
+
+function escapeHTML(text){
+
+  return text.replace(
+    /[&<>"']/g,
+
+    char => ({
+
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#039;"
+
+    }[char])
+
+  );
+
+}
+
+
+/* ================= GAMES ================= */
+
+function gameCard(game){
+
+  return `
+
+    <div class="game-card">
+
+      <div>
+
+        <div class="game-icon">
+          ${game.icon}
+        </div>
+
+        <h3>
+          ${game.name}
+        </h3>
+
+        <p>
+          ${game.description}
+          • ${game.players}
+        </p>
+
+      </div>
+
+
+      <button
+        class="primary"
+        onclick="openGame('${game.id}')">
+
+        Play
+
+      </button>
+
+    </div>
+
+  `;
+
+}
+
+
+function renderGames(){
+
+  $("gamesGrid").innerHTML =
+    games
+    .map(gameCard)
+    .join("");
+
+}
+
+
+function openGame(id){
+
+  currentGame =
+    games.find(
+      game=>game.id===id
+    );
+
+
+  openPage("game");
+
+
+  $("gameDetails").innerHTML = `
+
+    <div class="game-detail">
+
+      <div class="game-icon">
+        ${currentGame.icon}
+      </div>
+
+      <small>
+        GAME
+      </small>
+
+      <h1>
+        ${currentGame.name}
+      </h1>
+
+      <p>
+        ${currentGame.description}
+      </p>
+
+
+      <div class="mode-grid">
+
+
+        <button
+          class="mode"
+          onclick="playSolo()">
+
+          <b>
+            🎯 Play Solo
+          </b>
+
+          <span>
+            Play by yourself and practice.
+          </span>
+
+        </button>
+
+
+        <button
+          class="mode"
+          onclick="randomMatch()">
+
+          <b>
+            ⚡ Random Match
+          </b>
+
+          <span>
+            Find an available opponent automatically.
+          </span>
+
+        </button>
+
+
+        <button
+          class="mode"
+          onclick="openPrivateRoom()">
+
+          <b>
+            🔐 Private Room
+          </b>
+
+          <span>
+            Create a room and invite friends.
+          </span>
+
+        </button>
+
+
+      </div>
+
+    </div>
+
+  `;
+
+}
+
+
+function playSolo(){
+
+  state.score += 5;
+
+  save();
+
+  renderLeaderboard();
+
+  toast(
+    `${currentGame.name} started! +5 points`
+  );
+
+}
+
+
+function randomMatch(){
+
+  toast(
+    "Searching for an available opponent..."
+  );
+
+
+  setTimeout(()=>{
+
+    toast(
+      "Opponent found! Match ready."
+    );
+
+  },1200);
+
+}
+
+
+function openPrivateRoom(){
+
+  openPage("rooms");
+
+  createRoom(
+    currentGame
+    ? currentGame.name
+    : "Game"
+  );
+
+}
+
+
+/* ================= ROOMS ================= */
+
+function createRoom(gameName="Game"){
+
+  const code =
+    "FZ-" +
+    Math.random()
+    .toString(36)
+    .substring(2,7)
+    .toUpperCase();
+
+
+  state.rooms.push({
+
+    code:code,
+
+    game:gameName,
+
+    owner:state.account.name,
+
+    members:[
+      state.account.friendId
+    ]
+
+  });
+
+
+  save();
+
+  renderRooms();
+
+  updateUI();
+
+  toast(
+    "Room created: " + code
+  );
+
+}
+
+
+function joinRoom(){
+
+  const code =
+    $("roomCode")
+    .value
+    .trim()
+    .toUpperCase();
+
+
+  const room =
+    state.rooms.find(
+      r=>r.code===code
+    );
+
+
+  if(!room){
+
+    toast("Room not found.");
+
+    return;
+
+  }
+
+
+  if(
+    !room.members.includes(
+      state.account.friendId
+    )
+  ){
+
+    room.members.push(
+      state.account.friendId
+    );
+
+  }
+
+
+  save();
+
+  renderRooms();
+
+  toast(
+    "Joined room " + code
+  );
+
+}
+
+
+function renderRooms(){
+
+  const box =
+    $("roomsList");
+
+  if(!box)
+    return;
+
+
+  if(state.rooms.length===0){
+
+    box.innerHTML =
+      `<div class="empty">
+        No private rooms yet.<br>
+        Create one and invite your friends.
+      </div>`;
+
+    return;
+
+  }
+
+
+  box.innerHTML =
+    state.rooms
+    .map(room=>`
+
+      <div class="room-card">
+
+        <div>
+
+          <b>
+            ${room.game}
+          </b>
+
+          <small>
+
+            <br>
+
+            Room:
+            ${room.code}
+
+            •
+            ${room.members.length}
+            player(s)
+
+          </small>
+
+        </div>
+
+
+        <button
+          class="primary"
+          onclick="enterRoom('${room.code}')">
+
+          Enter
+
+        </button>
+
+      </div>
+
+    `)
+    .join("");
+
+}
+
+
+function enterRoom(code){
+
+  toast(
+    "Room " + code + " is ready!"
+  );
+
+}
+
+
+/* ================= COMPETITIONS ================= */
+
+function joinCompetition(){
+
+  state.score += 10;
+
+  save();
+
+  renderLeaderboard();
+
+  toast(
+    "Joined competition! +10 points"
+  );
+
+}
+
+
+function renderLeaderboard(){
+
+  const box =
+    $("leaderboard");
+
+  if(!box)
+    return;
+
+
+  const people = [
+
+    {
+
+      name:
+        state.account
+        ? state.account.name
+        : "You",
+
+      score:
+        state.score || 0
+
+    }
+
+  ];
+
+
+  state.friends.forEach(
+    (friend,index)=>{
+
+      people.push({
+
+        name:friend.name,
+
+        score:
+          Math.max(
+            0,
+            80-(index*13)
+          )
+
+      });
+
+    }
+  );
+
+
+  people.sort(
+    (a,b)=>b.score-a.score
+  );
+
+
+  box.innerHTML =
+    people
+    .map(
+      (person,index)=>`
+
+        <div class="rank">
+
+          <strong>
+            #${index+1}
+          </strong>
+
+          <span>
+            ${person.name}
+          </span>
+
+          <b>
+            ${person.score} pts
+          </b>
+
+        </div>
+
+      `
+    )
+    .join("");
+
+}
+
+
+/* ================= PROFILE ================= */
+
+function renderProfile(){
+
+  if(!state.account)
+    return;
+
+
+  $("profileName").textContent =
+    state.account.name;
+
+
+  $("profileEmail").textContent =
+    state.account.email;
+
+
+  $("profileID").textContent =
+    state.account.friendId;
+
+
+  $("bigAvatar").textContent =
+    state.account.name
+    .charAt(0)
+    .toUpperCase();
+
+}
+
+
+/* ================= START ================= */
+
+window.addEventListener(
+  "load",
+  ()=>{
+
+    if(
+      state.loggedIn &&
+      state.account
+    ){
+
+      $("navbar")
+        .classList
+        .remove("hidden");
+
+      enterApp();
+
+    }else{
+
+      showAuth("login");
+
+      createCaptcha();
+
+    }
+
+  }
+);
