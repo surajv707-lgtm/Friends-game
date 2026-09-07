@@ -1,1839 +1,3132 @@
-/* =====================================================
-   FRIENDZONE
-   Main website logic
-===================================================== */
+/* =========================================================
+   FRIENDZONE - PART 3
+   script.js
+   ========================================================= */
+
+/* =========================================================
+   1. GLOBAL STATE & STORAGE
+   ========================================================= */
+
+const STORAGE_KEY = "friendzone_data_v1";
+const CURRENT_USER_KEY = "friendzone_current_user";
+const THEME_KEY = "friendzone_theme";
+const SOUND_KEY = "friendzone_sound";
+
+let data = loadData();
+let currentUserId = localStorage.getItem(CURRENT_USER_KEY);
+let captchaAnswer = 0;
+let currentGame = null;
+let tapRushTimer = null;
+let tapRushCount = 0;
+let tapRushTime = 10;
+let memoryCards = [];
+let memoryFirst = null;
+let memorySecond = null;
+let memoryLock = false;
+let numberTarget = 0;
+let numberAttempts = 0;
 
 
-/* ================= STATE ================= */
+/* =========================================================
+   2. DEFAULT DATA
+   ========================================================= */
 
-let state = JSON.parse(
-  localStorage.getItem("friendzoneState")
-);
-
-if(!state){
-
-  state = {
-
-    account:null,
-
-    loggedIn:false,
-
-    friends:[],
-
-    requests:[],
-
-    bestFriends:[],
-
-    messages:{},
-
-    rooms:[],
-
-    score:0
-
-  };
-
+function defaultData() {
+    return {
+        users: [],
+        friendRequests: [],
+        bestFriendRequests: [],
+        rooms: [],
+        activities: [],
+        settings: {}
+    };
 }
 
-let captchaA = 0;
-let captchaB = 0;
+function loadData() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
 
-let currentChat = null;
-let currentGame = null;
+        if (!saved) {
+            return defaultData();
+        }
+
+        const parsed = JSON.parse(saved);
+
+        return {
+            ...defaultData(),
+            ...parsed
+        };
+    } catch (error) {
+        console.error("Could not load FriendZone data:", error);
+        return defaultData();
+    }
+}
+
+function saveData() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function getCurrentUser() {
+    if (!currentUserId) return null;
+
+    return data.users.find(user => user.id === currentUserId) || null;
+}
+
+function updateCurrentUser(callback) {
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    callback(user);
+    saveData();
+    renderEverything();
+}
 
 
-/* ================= GAMES ================= */
+/* =========================================================
+   3. DOM HELPERS
+   ========================================================= */
 
-const games = [
+function $(selector) {
+    return document.querySelector(selector);
+}
 
-  {
-    id:"tictactoe",
-    name:"Tic Tac Toe",
-    icon:"⭕",
-    description:"Classic 1v1 strategy game.",
-    players:"2 Players"
-  },
+function $$(selector) {
+    return document.querySelectorAll(selector);
+}
 
-  {
-    id:"rps",
-    name:"Rock Paper Scissors",
-    icon:"✊",
-    description:"Fast 1v1 battle.",
-    players:"2 Players"
-  },
+function showElement(element) {
+    if (element) {
+        element.classList.remove("hidden");
+    }
+}
 
-  {
-    id:"quiz",
-    name:"Quick Quiz",
-    icon:"🧠",
-    description:"Answer quickly and score points.",
-    players:"2+ Players"
-  },
+function hideElement(element) {
+    if (element) {
+        element.classList.add("hidden");
+    }
+}
 
-  {
-    id:"memory",
-    name:"Memory Match",
-    icon:"🃏",
-    description:"Test your memory and speed.",
-    players:"1–2 Players"
-  },
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
 
-  {
-    id:"dots",
-    name:"Dots Battle",
-    icon:"🔵",
-    description:"Capture more space than your opponent.",
-    players:"2 Players"
-  },
 
-  {
-    id:"reaction",
-    name:"Reaction Rush",
-    icon:"⚡",
-    description:"React faster than your opponent.",
-    players:"1–2 Players"
-  }
+/* =========================================================
+   4. TOAST
+   ========================================================= */
 
+function showToast(message, type = "info") {
+    let toast = $("#toast");
+
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "toast";
+        toast.className = "toast";
+        document.body.appendChild(toast);
+    }
+
+    toast.textContent = message;
+    toast.className = `toast show ${type}`;
+
+    clearTimeout(toast._timer);
+
+    toast._timer = setTimeout(() => {
+        toast.classList.remove("show");
+    }, 2800);
+}
+
+
+/* =========================================================
+   5. MODALS
+   ========================================================= */
+
+function openModal(modal) {
+    if (!modal) return;
+
+    modal.classList.add("active");
+    modal.classList.remove("hidden");
+    document.body.classList.add("modal-open");
+}
+
+function closeModal(modal) {
+    if (!modal) return;
+
+    modal.classList.remove("active");
+
+    setTimeout(() => {
+        modal.classList.add("hidden");
+    }, 180);
+
+    document.body.classList.remove("modal-open");
+}
+
+function showGeneralModal(title, content) {
+    const modal = $("#generalModal");
+
+    if (!modal) return;
+
+    const titleElement = modal.querySelector(".modal-title");
+    const bodyElement = modal.querySelector(".modal-body");
+
+    if (titleElement) {
+        titleElement.textContent = title;
+    }
+
+    if (bodyElement) {
+        bodyElement.innerHTML = content;
+    }
+
+    openModal(modal);
+}
+
+
+/* =========================================================
+   6. CAPTCHA
+   ========================================================= */
+
+function generateCaptcha() {
+    const num1 = Math.floor(Math.random() * 9) + 1;
+    const num2 = Math.floor(Math.random() * 9) + 1;
+
+    captchaAnswer = num1 + num2;
+
+    const question = $("#captchaQuestion");
+
+    if (question) {
+        question.textContent = `${num1} + ${num2} = ?`;
+    }
+
+    const input = $("#captchaInput");
+
+    if (input) {
+        input.value = "";
+    }
+}
+
+function verifyCaptcha() {
+    const input = $("#captchaInput");
+
+    if (!input) return false;
+
+    return Number(input.value) === captchaAnswer;
+}
+
+
+/* =========================================================
+   7. PASSWORD VALIDATION
+   ========================================================= */
+
+function validatePassword(password) {
+    const errors = [];
+
+    if (password.length < 8) {
+        errors.push("at least 8 characters");
+    }
+
+    if (!/[A-Z]/.test(password)) {
+        errors.push("one capital letter");
+    }
+
+    if (!/[0-9]/.test(password)) {
+        errors.push("one number");
+    }
+
+    return errors;
+}
+
+
+/* =========================================================
+   8. FRIEND ID
+   ========================================================= */
+
+function generateFriendID() {
+    let friendID;
+
+    do {
+        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const first =
+            letters[Math.floor(Math.random() * letters.length)] +
+            letters[Math.floor(Math.random() * letters.length)];
+
+        const numbers = Math.floor(100000 + Math.random() * 900000);
+
+        friendID = `FZ-${first}${numbers}`;
+    } while (data.users.some(user => user.friendId === friendID));
+
+    return friendID;
+}
+
+
+/* =========================================================
+   9. USER HELPERS
+   ========================================================= */
+
+function findUserByEmail(email) {
+    return data.users.find(
+        user => user.email.toLowerCase() === email.toLowerCase()
+    );
+}
+
+function findUserByFriendID(friendId) {
+    return data.users.find(
+        user => user.friendId.toLowerCase() === friendId.toLowerCase()
+    );
+}
+
+function getUserById(id) {
+    return data.users.find(user => user.id === id);
+}
+
+function createUser(name, email, password) {
+    const now = Date.now();
+
+    const user = {
+        id: crypto.randomUUID ? crypto.randomUUID() : `user_${now}_${Math.random()}`,
+        name,
+        email: email.toLowerCase(),
+        password,
+        friendId: generateFriendID(),
+
+        avatar: name.charAt(0).toUpperCase(),
+
+        friends: [],
+        bestFriends: [],
+
+        xp: 0,
+        level: 1,
+
+        gamesPlayed: 0,
+        gamesWon: 0,
+
+        streak: 0,
+        lastActiveDate: null,
+
+        thoughts: [],
+
+        achievements: [],
+
+        createdAt: now
+    };
+
+    data.users.push(user);
+
+    saveData();
+
+    return user;
+}
+
+
+/* =========================================================
+   10. AUTHENTICATION
+   ========================================================= */
+
+function setupAuthentication() {
+    const signInTab = $("#signInTab");
+    const signUpTab = $("#signUpTab");
+
+    const signInForm = $("#signInForm");
+    const signUpForm = $("#signUpForm");
+
+    if (signInTab) {
+        signInTab.addEventListener("click", () => {
+            signInTab.classList.add("active");
+            signUpTab?.classList.remove("active");
+
+            showElement(signInForm);
+            hideElement(signUpForm);
+        });
+    }
+
+    if (signUpTab) {
+        signUpTab.addEventListener("click", () => {
+            signUpTab.classList.add("active");
+            signInTab?.classList.remove("active");
+
+            showElement(signUpForm);
+            hideElement(signInForm);
+
+            generateCaptcha();
+        });
+    }
+
+    if (signInForm) {
+        signInForm.addEventListener("submit", handleSignIn);
+    }
+
+    if (signUpForm) {
+        signUpForm.addEventListener("submit", handleSignUp);
+    }
+
+    const forgotPassword = $("#forgotPassword");
+
+    if (forgotPassword) {
+        forgotPassword.addEventListener("click", showForgotPassword);
+    }
+
+    generateCaptcha();
+}
+
+function handleSignUp(event) {
+    event.preventDefault();
+
+    const nameInput = $("#signupName");
+    const emailInput = $("#signupEmail");
+    const passwordInput = $("#signupPassword");
+
+    const name = nameInput?.value.trim();
+    const email = emailInput?.value.trim();
+    const password = passwordInput?.value;
+
+    if (!name || name.length < 2) {
+        showToast("Please enter your name.", "error");
+        return;
+    }
+
+    if (!email || !email.includes("@")) {
+        showToast("Please enter a valid email.", "error");
+        return;
+    }
+
+    if (findUserByEmail(email)) {
+        showToast("This email is already registered.", "error");
+        return;
+    }
+
+    const passwordErrors = validatePassword(password);
+
+    if (passwordErrors.length) {
+        showToast(
+            `Password needs ${passwordErrors.join(", ")}.`,
+            "error"
+        );
+        return;
+    }
+
+    if (!verifyCaptcha()) {
+        showToast("CAPTCHA answer is incorrect.", "error");
+        generateCaptcha();
+        return;
+    }
+
+    const user = createUser(name, email, password);
+
+    currentUserId = user.id;
+    localStorage.setItem(CURRENT_USER_KEY, user.id);
+
+    updateStreak(user);
+
+    showApp();
+
+    showToast(
+        `Welcome to FriendZone, ${user.name}!`,
+        "success"
+    );
+
+    launchConfetti();
+}
+
+function handleSignIn(event) {
+    event.preventDefault();
+
+    const email = $("#signinEmail")?.value.trim();
+    const password = $("#signinPassword")?.value;
+
+    const user = findUserByEmail(email);
+
+    if (!user) {
+        showToast("No account found with this email.", "error");
+        return;
+    }
+
+    if (user.password !== password) {
+        showToast("Incorrect password.", "error");
+        return;
+    }
+
+    currentUserId = user.id;
+
+    localStorage.setItem(
+        CURRENT_USER_KEY,
+        user.id
+    );
+
+    updateStreak(user);
+
+    showApp();
+
+    showToast(
+        `Welcome back, ${user.name}!`,
+        "success"
+    );
+}
+
+function showApp() {
+    const authScreen = $("#authScreen");
+    const appShell = $("#appShell");
+
+    hideElement(authScreen);
+    showElement(appShell);
+
+    renderEverything();
+}
+
+function showAuth() {
+    const authScreen = $("#authScreen");
+    const appShell = $("#appShell");
+
+    showElement(authScreen);
+    hideElement(appShell);
+
+    generateCaptcha();
+}
+
+
+/* =========================================================
+   11. FORGOT PASSWORD
+   ========================================================= */
+
+function showForgotPassword() {
+    showGeneralModal(
+        "Reset Password",
+        `
+        <div class="reset-password-box">
+            <p>Enter your registered email address.</p>
+
+            <input
+                id="resetEmail"
+                class="input"
+                type="email"
+                placeholder="Registered email"
+            >
+
+            <button class="btn btn-primary full-width" id="verifyResetEmail">
+                Verify Email
+            </button>
+
+            <div id="resetStepTwo" class="hidden">
+                <br>
+
+                <input
+                    id="newResetPassword"
+                    class="input"
+                    type="password"
+                    placeholder="New password"
+                >
+
+                <button class="btn btn-primary full-width" id="resetPasswordBtn">
+                    Reset Password
+                </button>
+            </div>
+        </div>
+        `
+    );
+
+    $("#verifyResetEmail")?.addEventListener("click", () => {
+        const email = $("#resetEmail")?.value.trim();
+
+        const user = findUserByEmail(email);
+
+        if (!user) {
+            showToast(
+                "This email is not registered.",
+                "error"
+            );
+            return;
+        }
+
+        $("#resetStepTwo")?.classList.remove("hidden");
+
+        showToast(
+            "Email verified. Enter your new password.",
+            "success"
+        );
+    });
+
+    document.addEventListener(
+        "click",
+        handleResetPasswordClick,
+        {
+            once: true
+        }
+    );
+}
+
+function handleResetPasswordClick(event) {
+    if (!event.target.matches("#resetPasswordBtn")) return;
+
+    const email = $("#resetEmail")?.value.trim();
+    const newPassword = $("#newResetPassword")?.value;
+
+    const user = findUserByEmail(email);
+
+    if (!user) {
+        showToast("Email verification failed.", "error");
+        return;
+    }
+
+    const errors = validatePassword(newPassword);
+
+    if (errors.length) {
+        showToast(
+            `Password needs ${errors.join(", ")}.`,
+            "error"
+        );
+        return;
+    }
+
+    user.password = newPassword;
+
+    saveData();
+
+    closeModal($("#generalModal"));
+
+    showToast(
+        "Password successfully reset.",
+        "success"
+    );
+}
+
+
+/* =========================================================
+   12. LOGOUT
+   ========================================================= */
+
+function logout() {
+    localStorage.removeItem(CURRENT_USER_KEY);
+    currentUserId = null;
+
+    showAuth();
+
+    showToast(
+        "You have been logged out.",
+        "success"
+    );
+}
+
+
+/* =========================================================
+   13. NAVIGATION
+   ========================================================= */
+
+function setupNavigation() {
+    $$(".nav-link").forEach(link => {
+        link.addEventListener("click", () => {
+            const target = link.dataset.section;
+
+            if (!target) return;
+
+            navigateTo(target);
+        });
+    });
+
+    $$("[data-go]").forEach(button => {
+        button.addEventListener("click", () => {
+            navigateTo(button.dataset.go);
+        });
+    });
+}
+
+function navigateTo(sectionName) {
+    $$(".app-section").forEach(section => {
+        section.classList.remove("active");
+    });
+
+    const target = $(`#${sectionName}`);
+
+    if (target) {
+        target.classList.add("active");
+    }
+
+    $$(".nav-link").forEach(link => {
+        link.classList.toggle(
+            "active",
+            link.dataset.section === sectionName
+        );
+    });
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+
+    renderEverything();
+}
+
+
+/* =========================================================
+   14. MOBILE NAVIGATION
+   ========================================================= */
+
+function setupMobileNavigation() {
+    const menuButton = $("#menuButton");
+    const nav = $("#mainNav");
+
+    if (!menuButton || !nav) return;
+
+    menuButton.addEventListener("click", () => {
+        nav.classList.toggle("open");
+    });
+
+    $$(".nav-link").forEach(link => {
+        link.addEventListener("click", () => {
+            nav.classList.remove("open");
+        });
+    });
+}
+
+
+/* =========================================================
+   15. THEME
+   ========================================================= */
+
+function setupTheme() {
+    const savedTheme =
+        localStorage.getItem(THEME_KEY) || "dark";
+
+    applyTheme(savedTheme);
+
+    $("#themeButton")?.addEventListener(
+        "click",
+        toggleTheme
+    );
+}
+
+function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+
+    localStorage.setItem(
+        THEME_KEY,
+        theme
+    );
+
+    const button = $("#themeButton");
+
+    if (button) {
+        button.innerHTML =
+            theme === "dark"
+                ? "☀️"
+                : "🌙";
+    }
+}
+
+function toggleTheme() {
+    const current =
+        document.documentElement.dataset.theme ||
+        "dark";
+
+    const next =
+        current === "dark"
+            ? "light"
+            : "dark";
+
+    applyTheme(next);
+
+    playSound("click");
+}
+
+
+/* =========================================================
+   16. SOUND SYSTEM
+   ========================================================= */
+
+let audioContext = null;
+
+function isSoundEnabled() {
+    return localStorage.getItem(SOUND_KEY) !== "off";
+}
+
+function setupSound() {
+    updateSoundButton();
+
+    $("#soundButton")?.addEventListener(
+        "click",
+        toggleSound
+    );
+}
+
+function toggleSound() {
+    const enabled = isSoundEnabled();
+
+    localStorage.setItem(
+        SOUND_KEY,
+        enabled ? "off" : "on"
+    );
+
+    updateSoundButton();
+
+    if (!enabled) {
+        playSound("success");
+    }
+}
+
+function updateSoundButton() {
+    const button = $("#soundButton");
+
+    if (!button) return;
+
+    button.innerHTML =
+        isSoundEnabled()
+            ? "🔊"
+            : "🔇";
+}
+
+function getAudioContext() {
+    if (!audioContext) {
+        const AudioCtx =
+            window.AudioContext ||
+            window.webkitAudioContext;
+
+        if (!AudioCtx) return null;
+
+        audioContext = new AudioCtx();
+    }
+
+    return audioContext;
+}
+
+function playSound(type = "click") {
+    if (!isSoundEnabled()) return;
+
+    const ctx = getAudioContext();
+
+    if (!ctx) return;
+
+    const oscillator =
+        ctx.createOscillator();
+
+    const gain =
+        ctx.createGain();
+
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+
+    let frequency = 500;
+
+    if (type === "success") {
+        frequency = 700;
+    }
+
+    if (type === "error") {
+        frequency = 180;
+    }
+
+    if (type === "win") {
+        frequency = 850;
+    }
+
+    oscillator.frequency.value = frequency;
+    oscillator.type = "sine";
+
+    gain.gain.setValueAtTime(
+        0.0001,
+        ctx.currentTime
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+        0.08,
+        ctx.currentTime + 0.01
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        ctx.currentTime + 0.18
+    );
+
+    oscillator.start();
+    oscillator.stop(
+        ctx.currentTime + 0.2
+    );
+}
+
+
+/* =========================================================
+   17. STREAK SYSTEM
+   ========================================================= */
+
+function getTodayString() {
+    const date = new Date();
+
+    return date.toISOString().split("T")[0];
+}
+
+function getYesterdayString() {
+    const date = new Date();
+
+    date.setDate(date.getDate() - 1);
+
+    return date.toISOString().split("T")[0];
+}
+
+function updateStreak(user) {
+    const today = getTodayString();
+
+    if (!user.lastActiveDate) {
+        user.streak = 1;
+        user.lastActiveDate = today;
+    } else if (user.lastActiveDate === today) {
+        return;
+    } else if (user.lastActiveDate === getYesterdayString()) {
+        user.streak += 1;
+        user.lastActiveDate = today;
+    } else {
+        user.streak = 1;
+        user.lastActiveDate = today;
+    }
+
+    saveData();
+}
+
+
+/* =========================================================
+   18. XP / LEVEL
+   ========================================================= */
+
+function addXP(amount) {
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    const oldLevel = user.level;
+
+    user.xp += amount;
+
+    user.level =
+        Math.floor(user.xp / 500) + 1;
+
+    saveData();
+
+    if (user.level > oldLevel) {
+        playSound("win");
+
+        launchConfetti();
+
+        showToast(
+            `🎉 Level Up! You are now Level ${user.level}!`,
+            "success"
+        );
+    }
+}
+
+
+/* =========================================================
+   19. FRIEND SYSTEM
+   ========================================================= */
+
+function areFriends(userA, userB) {
+    if (!userA || !userB) return false;
+
+    return (
+        userA.friends.includes(userB.id) &&
+        userB.friends.includes(userA.id)
+    );
+}
+
+function pendingFriendRequest(fromId, toId) {
+    return data.friendRequests.find(
+        request =>
+            request.from === fromId &&
+            request.to === toId &&
+            request.status === "pending"
+    );
+}
+
+function sendFriendRequest(friendId) {
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) {
+        showToast("Please sign in first.", "error");
+        return;
+    }
+
+    const targetUser =
+        findUserByFriendID(friendId);
+
+    if (!targetUser) {
+        showToast(
+            "Friend ID not found.",
+            "error"
+        );
+        return;
+    }
+
+    if (targetUser.id === currentUser.id) {
+        showToast(
+            "You cannot add yourself.",
+            "error"
+        );
+        return;
+    }
+
+    if (areFriends(currentUser, targetUser)) {
+        showToast(
+            "You are already friends.",
+            "info"
+        );
+        return;
+    }
+
+    if (
+        pendingFriendRequest(
+            currentUser.id,
+            targetUser.id
+        )
+    ) {
+        showToast(
+            "Friend request already sent.",
+            "info"
+        );
+        return;
+    }
+
+    if (
+        pendingFriendRequest(
+            targetUser.id,
+            currentUser.id
+        )
+    ) {
+        showToast(
+            "This person already sent you a request.",
+            "info"
+        );
+        return;
+    }
+
+    data.friendRequests.push({
+        id:
+            crypto.randomUUID?.() ||
+            `request_${Date.now()}`,
+        from: currentUser.id,
+        to: targetUser.id,
+        status: "pending",
+        createdAt: Date.now()
+    });
+
+    saveData();
+
+    showToast(
+        `Friend request sent to ${targetUser.name}!`,
+        "success"
+    );
+
+    renderEverything();
+}
+
+function acceptFriendRequest(requestId) {
+    const request =
+        data.friendRequests.find(
+            item => item.id === requestId
+        );
+
+    if (!request) return;
+
+    const currentUser = getCurrentUser();
+
+    if (!currentUser || request.to !== currentUser.id) {
+        return;
+    }
+
+    const sender =
+        getUserById(request.from);
+
+    if (!sender) return;
+
+    if (!currentUser.friends.includes(sender.id)) {
+        currentUser.friends.push(sender.id);
+    }
+
+    if (!sender.friends.includes(currentUser.id)) {
+        sender.friends.push(currentUser.id);
+    }
+
+    request.status = "accepted";
+
+    saveData();
+
+    addXP(30);
+
+    showToast(
+        `🎉 You and ${sender.name} are now friends!`,
+        "success"
+    );
+
+    launchConfetti();
+
+    renderEverything();
+}
+
+function rejectFriendRequest(requestId) {
+    const request =
+        data.friendRequests.find(
+            item => item.id === requestId
+        );
+
+    if (!request) return;
+
+    const currentUser = getCurrentUser();
+
+    if (!currentUser || request.to !== currentUser.id) {
+        return;
+    }
+
+    request.status = "rejected";
+
+    saveData();
+
+    showToast(
+        "Friend request rejected.",
+        "info"
+    );
+
+    renderEverything();
+}
+
+function removeFriend(friendId) {
+    const currentUser = getCurrentUser();
+    const friend = getUserById(friendId);
+
+    if (!currentUser || !friend) return;
+
+    currentUser.friends =
+        currentUser.friends.filter(
+            id => id !== friend.id
+        );
+
+    friend.friends =
+        friend.friends.filter(
+            id => id !== currentUser.id
+        );
+
+    currentUser.bestFriends =
+        currentUser.bestFriends.filter(
+            id => id !== friend.id
+        );
+
+    friend.bestFriends =
+        friend.bestFriends.filter(
+            id => id !== currentUser.id
+        );
+
+    saveData();
+
+    showToast(
+        `${friend.name} removed from friends.`,
+        "info"
+    );
+
+    renderEverything();
+}
+
+
+/* =========================================================
+   20. BEST FRIEND SYSTEM
+   ========================================================= */
+
+function isBestFriend(user, friendId) {
+    return user.bestFriends.includes(friendId);
+}
+
+function toggleBestFriend(friendId) {
+    const user = getCurrentUser();
+    const friend = getUserById(friendId);
+
+    if (!user || !friend) return;
+
+    if (!areFriends(user, friend)) {
+        showToast(
+            "You can only choose a friend as Best Friend.",
+            "error"
+        );
+        return;
+    }
+
+    if (isBestFriend(user, friendId)) {
+        user.bestFriends =
+            user.bestFriends.filter(
+                id => id !== friendId
+            );
+
+        saveData();
+
+        showToast(
+            `${friend.name} removed from Best Friends.`,
+            "info"
+        );
+
+        renderEverything();
+        return;
+    }
+
+    user.bestFriends.push(friendId);
+
+    saveData();
+
+    addXP(20);
+
+    showToast(
+        `⭐ ${friend.name} added to Best Friends!`,
+        "success"
+    );
+
+    renderEverything();
+}
+
+
+/* =========================================================
+   21. FRIEND SEARCH
+   ========================================================= */
+
+function setupFriendSystem() {
+    $("#sendFriendRequest")?.addEventListener(
+        "click",
+        () => {
+            const input = $("#friendIdInput");
+
+            if (!input) return;
+
+            sendFriendRequest(
+                input.value.trim()
+            );
+
+            input.value = "";
+        }
+    );
+
+    $("#friendIdInput")?.addEventListener(
+        "keydown",
+        event => {
+            if (event.key === "Enter") {
+                $("#sendFriendRequest")?.click();
+            }
+        }
+    );
+
+    document.addEventListener(
+        "click",
+        event => {
+            const acceptButton =
+                event.target.closest(
+                    "[data-accept-request]"
+                );
+
+            if (acceptButton) {
+                acceptFriendRequest(
+                    acceptButton.dataset.acceptRequest
+                );
+            }
+
+            const rejectButton =
+                event.target.closest(
+                    "[data-reject-request]"
+                );
+
+            if (rejectButton) {
+                rejectFriendRequest(
+                    rejectButton.dataset.rejectRequest
+                );
+            }
+
+            const removeButton =
+                event.target.closest(
+                    "[data-remove-friend]"
+                );
+
+            if (removeButton) {
+                removeFriend(
+                    removeButton.dataset.removeFriend
+                );
+            }
+
+            const bestButton =
+                event.target.closest(
+                    "[data-best-friend]"
+                );
+
+            if (bestButton) {
+                toggleBestFriend(
+                    bestButton.dataset.bestFriend
+                );
+            }
+        }
+    );
+}
+
+
+/* =========================================================
+   22. FRIEND THOUGHTS
+   ========================================================= */
+
+function addThought() {
+    const input =
+        $("#thoughtInput");
+
+    if (!input) return;
+
+    const text =
+        input.value.trim();
+
+    if (!text) {
+        showToast(
+            "Write something first.",
+            "error"
+        );
+        return;
+    }
+
+    if (text.length > 160) {
+        showToast(
+            "Thought must be under 160 characters.",
+            "error"
+        );
+        return;
+    }
+
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    user.thoughts.unshift({
+        id:
+            crypto.randomUUID?.() ||
+            `thought_${Date.now()}`,
+        text,
+        createdAt: Date.now()
+    });
+
+    user.thoughts =
+        user.thoughts.slice(0, 5);
+
+    saveData();
+
+    input.value = "";
+
+    addXP(5);
+
+    showToast(
+        "Thought posted!",
+        "success"
+    );
+
+    renderEverything();
+}
+
+
+/* =========================================================
+   23. ACHIEVEMENTS
+   ========================================================= */
+
+const ACHIEVEMENTS = [
+    {
+        id: "first_friend",
+        title: "First Friend",
+        description: "Make your first friend.",
+        icon: "🤝"
+    },
+    {
+        id: "five_friends",
+        title: "Social Star",
+        description: "Have 5 friends.",
+        icon: "⭐"
+    },
+    {
+        id: "best_friend",
+        title: "Bestie",
+        description: "Choose a Best Friend.",
+        icon: "💜"
+    },
+    {
+        id: "first_game",
+        title: "Game On",
+        description: "Play your first game.",
+        icon: "🎮"
+    },
+    {
+        id: "game_winner",
+        title: "Winner",
+        description: "Win a game.",
+        icon: "🏆"
+    },
+    {
+        id: "level_five",
+        title: "Rising Star",
+        description: "Reach Level 5.",
+        icon: "🚀"
+    },
+    {
+        id: "streak_seven",
+        title: "7 Day Streak",
+        description: "Maintain a 7 day streak.",
+        icon: "🔥"
+    }
 ];
 
+function checkAchievements() {
+    const user = getCurrentUser();
 
-/* ================= HELPERS ================= */
+    if (!user) return;
 
-function $(id){
-  return document.getElementById(id);
-}
+    const checks = {
+        first_friend:
+            user.friends.length >= 1,
 
+        five_friends:
+            user.friends.length >= 5,
 
-function save(){
+        best_friend:
+            user.bestFriends.length >= 1,
 
-  localStorage.setItem(
-    "friendzoneState",
-    JSON.stringify(state)
-  );
+        first_game:
+            user.gamesPlayed >= 1,
 
-}
+        game_winner:
+            user.gamesWon >= 1,
 
+        level_five:
+            user.level >= 5,
 
-function toast(message){
+        streak_seven:
+            user.streak >= 7
+    };
 
-  const box = $("toast");
-
-  box.textContent = message;
-
-  box.classList.add("show");
-
-  setTimeout(()=>{
-    box.classList.remove("show");
-  },2200);
-
-}
-
-
-/* ================= AUTH ================= */
-
-function showAuth(type){
-
-  $("loginBox").classList.add("hidden");
-  $("signupBox").classList.add("hidden");
-  $("forgotBox").classList.add("hidden");
-  $("resetBox").classList.add("hidden");
-
-  $("loginTab").classList.remove("active");
-  $("signupTab").classList.remove("active");
-
-
-  if(type==="login"){
-
-    $("loginBox").classList.remove("hidden");
-    $("loginTab").classList.add("active");
-
-  }
-
-
-  if(type==="signup"){
-
-    $("signupBox").classList.remove("hidden");
-    $("signupTab").classList.add("active");
-
-  }
-
-
-  if(type==="forgot"){
-
-    $("forgotBox").classList.remove("hidden");
-
-  }
-
-}
-
-
-function validPassword(password){
-
-  return (
-
-    password.length >= 8 &&
-
-    /[A-Z]/.test(password) &&
-
-    /[0-9]/.test(password)
-
-  );
-
-}
-
-
-function checkPassword(inputID,rulesID){
-
-  const password = $(inputID).value;
-
-  $(rulesID).innerHTML = `
-
-    <span class="rule ${password.length>=8?"ok":""}">
-      8+ Characters
-    </span>
-
-    <span class="rule ${/[A-Z]/.test(password)?"ok":""}">
-      Capital Letter
-    </span>
-
-    <span class="rule ${/[0-9]/.test(password)?"ok":""}">
-      Number
-    </span>
-
-  `;
-
-}
-
-
-/* CAPTCHA */
-
-function createCaptcha(){
-
-  captchaA =
-    Math.floor(Math.random()*9)+1;
-
-  captchaB =
-    Math.floor(Math.random()*9)+1;
-
-  $("captchaQuestion").textContent =
-    `${captchaA} + ${captchaB} = ?`;
-
-  $("captchaAnswer").value = "";
-
-}
-
-
-/* FRIEND ID */
-
-function generateFriendID(){
-
-  return (
-    "FZ-" +
-    Math.floor(
-      100000 +
-      Math.random()*900000
-    )
-  );
-
-}
-
-
-/* SIGNUP */
-
-function signup(){
-
-  const name =
-    $("signupName").value.trim();
-
-  const email =
-    $("signupEmail").value
-    .trim()
-    .toLowerCase();
-
-  const password =
-    $("signupPassword").value;
-
-  const answer =
-    Number(
-      $("captchaAnswer").value
-    );
-
-
-  if(!name || !email || !password){
-
-    toast("Please fill all fields.");
-
-    return;
-
-  }
-
-
-  if(!validPassword(password)){
-
-    toast(
-      "Password needs 8+ characters, capital letter and number."
-    );
-
-    return;
-
-  }
-
-
-  if(answer !== captchaA + captchaB){
-
-    toast("Wrong CAPTCHA.");
-
-    createCaptcha();
-
-    return;
-
-  }
-
-
-  if(state.account &&
-     state.account.email === email){
-
-    toast("Email is already registered.");
-
-    return;
-
-  }
-
-
-  state.account = {
-
-    name:name,
-
-    email:email,
-
-    password:password,
-
-    friendId:generateFriendID()
-
-  };
-
-
-  state.loggedIn = true;
-
-  save();
-
-  toast("Account created successfully!");
-
-  enterApp();
-
-}
-
-
-/* LOGIN */
-
-function login(){
-
-  const email =
-    $("loginEmail").value
-    .trim()
-    .toLowerCase();
-
-  const password =
-    $("loginPassword").value;
-
-
-  if(
-    !state.account ||
-    state.account.email !== email ||
-    state.account.password !== password
-  ){
-
-    toast("Invalid email or password.");
-
-    return;
-
-  }
-
-
-  state.loggedIn = true;
-
-  save();
-
-  toast("Login successful!");
-
-  enterApp();
-
-}
-
-
-/* FORGOT PASSWORD */
-
-function verifyEmail(){
-
-  const email =
-    $("forgotEmail").value
-    .trim()
-    .toLowerCase();
-
-
-  if(
-    !state.account ||
-    state.account.email !== email
-  ){
-
-    toast("Email not found.");
-
-    return;
-
-  }
-
-
-  $("forgotBox").classList.add("hidden");
-
-  $("resetBox").classList.remove("hidden");
-
-  toast("Email verified.");
-
-}
-
-
-/* RESET PASSWORD */
-
-function resetPassword(){
-
-  const password =
-    $("newPassword").value;
-
-  const confirm =
-    $("confirmPassword").value;
-
-
-  if(!validPassword(password)){
-
-    toast(
-      "Password needs 8+ characters, capital letter and number."
-    );
-
-    return;
-
-  }
-
-
-  if(password !== confirm){
-
-    toast("Passwords do not match.");
-
-    return;
-
-  }
-
-
-  state.account.password = password;
-
-  save();
-
-
-  $("resetBox").classList.add("hidden");
-
-  $("loginBox").classList.remove("hidden");
-
-  $("loginTab").classList.add("active");
-
-  toast("Password renewed. Login now.");
-
-}
-
-
-/* ENTER WEBSITE */
-
-function enterApp(){
-
-  $("authPage")
-    .classList
-    .remove("active");
-
-  $("navbar")
-    .classList
-    .remove("hidden");
-
-  updateUI();
-
-  openPage("home");
-
-}
-
-
-/* LOGOUT */
-
-function logout(){
-
-  state.loggedIn = false;
-
-  save();
-
-  $("navbar")
-    .classList
-    .add("hidden");
-
-  document
-    .querySelectorAll(".page")
-    .forEach(page=>{
-      page.classList.remove("active");
-    });
-
-  $("authPage")
-    .classList
-    .add("active");
-
-  showAuth("login");
-
-  toast("Logged out.");
-
-}
-
-
-/* ================= NAVIGATION ================= */
-
-function openPage(page){
-
-  if(!state.loggedIn){
-
-    return;
-
-  }
-
-
-  document
-    .querySelectorAll(".page")
-    .forEach(p=>{
-      p.classList.remove("active");
-    });
-
-
-  const target =
-    $(page + "Page");
-
-
-  if(target){
-
-    target.classList.add("active");
-
-  }
-
-
-  if(page==="home")
-    renderHome();
-
-  if(page==="friends")
-    renderFriends();
-
-  if(page==="bestfriends")
-    renderBestFriends();
-
-  if(page==="chat")
-    renderChat();
-
-  if(page==="games")
-    renderGames();
-
-  if(page==="rooms")
-    renderRooms();
-
-  if(page==="competitions")
-    renderLeaderboard();
-
-  if(page==="profile")
-    renderProfile();
-
-}
-
-
-/* ================= UI ================= */
-
-function updateUI(){
-
-  if(!state.account)
-    return;
-
-
-  const firstLetter =
-    state.account.name
-    .charAt(0)
-    .toUpperCase();
-
-
-  $("topAvatar").textContent =
-    firstLetter;
-
-  $("topName").textContent =
-    state.account.name
-    .split(" ")[0];
-
-
-  $("homeName").textContent =
-    state.account.name
-    .split(" ")[0];
-
-
-  $("homeFriendID").textContent =
-    state.account.friendId;
-
-
-  $("friendCount").textContent =
-    state.friends.length;
-
-
-  $("bestCount").textContent =
-    state.bestFriends.length;
-
-
-  $("roomCount").textContent =
-    state.rooms.length;
-
-
-  renderHomeGames();
-
-  renderFriends();
-
-  renderBestFriends();
-
-  renderChat();
-
-  renderRooms();
-
-  renderLeaderboard();
-
-  renderProfile();
-
-}
-
-
-/* ================= HOME ================= */
-
-function renderHome(){
-
-  updateUI();
-
-  renderHomeGames();
-
-}
-
-
-function renderHomeGames(){
-
-  const box =
-    $("homeGames");
-
-  if(!box)
-    return;
-
-
-  box.innerHTML =
-    games
-      .slice(0,3)
-      .map(gameCard)
-      .join("");
-
-}
-
-
-/* ================= FRIENDS ================= */
-
-function sendFriendRequest(){
-
-  const id =
-    $("friendIDInput")
-    .value
-    .trim()
-    .toUpperCase();
-
-
-  if(!/^FZ-\d{6}$/.test(id)){
-
-    toast("Enter a valid Friend ID.");
-
-    return;
-
-  }
-
-
-  if(id===state.account.friendId){
-
-    toast("You cannot add yourself.");
-
-    return;
-
-  }
-
-
-  if(
-    state.friends.some(
-      f=>f.friendId===id
-    )
-  ){
-
-    toast("Already your friend.");
-
-    return;
-
-  }
-
-
-  if(
-    state.requests.some(
-      r=>r.friendId===id
-    )
-  ){
-
-    toast("Request already pending.");
-
-    return;
-
-  }
-
-
-  /*
-    Demo frontend:
-    In the real backend version this request
-    will be delivered to the user owning
-    this Friend ID.
-  */
-
-  state.requests.push({
-
-    friendId:id,
-
-    name:"Friend " +
-      id.substring(3),
-
-    incoming:false
-
-  });
-
-
-  save();
-
-  $("friendIDInput").value="";
-
-  toast(
-    "Friend request sent!"
-  );
-
-  renderFriends();
-
-}
-
-
-function acceptRequest(index){
-
-  const request =
-    state.requests[index];
-
-
-  state.friends.push({
-
-    friendId:request.friendId,
-
-    name:request.name
-
-  });
-
-
-  state.requests.splice(
-    index,
-    1
-  );
-
-
-  save();
-
-  renderFriends();
-
-  updateUI();
-
-  toast(
-    "Friend added successfully!"
-  );
-
-}
-
-
-function rejectRequest(index){
-
-  state.requests.splice(
-    index,
-    1
-  );
-
-  save();
-
-  renderFriends();
-
-  toast("Request rejected.");
-
-}
-
-
-function removeFriend(id){
-
-  state.friends =
-    state.friends.filter(
-      f=>f.friendId!==id
-    );
-
-
-  state.bestFriends =
-    state.bestFriends.filter(
-      x=>x!==id
-    );
-
-
-  delete state.messages[id];
-
-  save();
-
-  renderFriends();
-
-  renderBestFriends();
-
-  updateUI();
-
-  toast("Friend removed.");
-
-}
-
-
-function makeBestFriend(id){
-
-  if(
-    !state.friends.some(
-      f=>f.friendId===id
-    )
-  ){
-
-    toast(
-      "Only friends can become Best Friends."
-    );
-
-    return;
-
-  }
-
-
-  if(
-    state.bestFriends.includes(id)
-  ){
-
-    state.bestFriends =
-      state.bestFriends.filter(
-        x=>x!==id
-      );
-
-    toast("Removed from Best Friends.");
-
-  }else{
-
-    state.bestFriends.push(id);
-
-    toast("Added to Best Friends 💜");
-
-  }
-
-
-  save();
-
-  renderFriends();
-
-  renderBestFriends();
-
-  updateUI();
-
-}
-
-
-function renderFriends(){
-
-  const box =
-    $("friendsList");
-
-  if(!box)
-    return;
-
-
-  if(state.friends.length===0){
-
-    box.innerHTML = `
-
-      <div class="empty">
-
-        No friends yet.<br>
-
-        Add someone using their Friend ID.
-
-      </div>
-
-    `;
-
-  }else{
-
-    box.innerHTML =
-      state.friends
-      .map(friend=>`
-
-        <div class="friend-card">
-
-          <div class="avatar">
-            ${friend.name.charAt(0)}
-          </div>
-
-          <div class="friend-info">
-
-            <b>
-              ${friend.name}
-            </b>
-
-            <small>
-              ${friend.friendId}
-            </small>
-
-          </div>
-
-
-          <div class="friend-actions">
-
-            <button
-              class="secondary"
-              onclick="startChat('${friend.friendId}')">
-
-              Chat
-
-            </button>
-
-
-            <button
-              class="secondary"
-              onclick="makeBestFriend('${friend.friendId}')">
-
-              ${
-                state.bestFriends.includes(
-                  friend.friendId
+    Object.entries(checks).forEach(
+        ([achievementId, unlocked]) => {
+            if (
+                unlocked &&
+                !user.achievements.includes(
+                    achievementId
                 )
-                ? "💜 Best"
-                : "☆ Best"
-              }
+            ) {
+                user.achievements.push(
+                    achievementId
+                );
 
-            </button>
+                const achievement =
+                    ACHIEVEMENTS.find(
+                        item =>
+                            item.id ===
+                            achievementId
+                    );
 
+                if (achievement) {
+                    showToast(
+                        `${achievement.icon} Achievement unlocked: ${achievement.title}`,
+                        "success"
+                    );
 
-            <button
-              class="danger"
-              onclick="removeFriend('${friend.friendId}')">
+                    launchConfetti();
+                }
+            }
+        }
+    );
 
-              Remove
-
-            </button>
-
-          </div>
-
-        </div>
-
-      `)
-      .join("");
-
-  }
-
-
-  const requests =
-    $("requestsList");
-
-
-  requests.innerHTML =
-    state.requests.length
-
-    ?
-
-    state.requests
-      .map((request,index)=>`
-
-        <div class="friend-card">
-
-          <div class="avatar">
-            ?
-          </div>
-
-          <div class="friend-info">
-
-            <b>
-              ${request.name}
-            </b>
-
-            <small>
-              ${request.friendId}
-            </small>
-
-          </div>
-
-
-          <div class="friend-actions">
-
-            <button
-              class="primary"
-              onclick="acceptRequest(${index})">
-
-              Accept
-
-            </button>
-
-
-            <button
-              class="danger"
-              onclick="rejectRequest(${index})">
-
-              Reject
-
-            </button>
-
-          </div>
-
-        </div>
-
-      `)
-      .join("")
-
-    :
-
-    `<div class="empty">
-      No friend requests.
-    </div>`;
-
-
-  $("requestCount").textContent =
-    state.requests.length
-    ? `(${state.requests.length})`
-    : "";
-
+    saveData();
 }
 
 
-function friendTab(id,button){
+/* =========================================================
+   24. GAME SYSTEM
+   ========================================================= */
 
-  $("friendsList")
-    .classList
-    .toggle(
-      "hidden",
-      id!=="friendsList"
+function openGame(gameName) {
+    currentGame = gameName;
+
+    const modal =
+        $("#gameModal");
+
+    if (!modal) return;
+
+    const title =
+        modal.querySelector(".game-modal-title");
+
+    const body =
+        modal.querySelector(".game-modal-body");
+
+    if (title) {
+        title.textContent =
+            getGameTitle(gameName);
+    }
+
+    if (body) {
+        body.innerHTML =
+            getGameHTML(gameName);
+    }
+
+    openModal(modal);
+
+    initializeGame(gameName);
+}
+
+function getGameTitle(gameName) {
+    const titles = {
+        tapRush: "⚡ Tap Rush",
+        memoryMatch: "🧠 Memory Match",
+        numberGuess: "🔢 Number Guess"
+    };
+
+    return titles[gameName] || "FriendZone Game";
+}
+
+function getGameHTML(gameName) {
+    if (gameName === "tapRush") {
+        return `
+            <div class="game-screen tap-rush-game">
+                <p>Tap as many times as you can in 10 seconds!</p>
+
+                <div class="game-score">
+                    Score:
+                    <strong id="tapScore">0</strong>
+                </div>
+
+                <div class="game-timer">
+                    Time:
+                    <strong id="tapTimer">10</strong>
+                </div>
+
+                <button
+                    id="tapButton"
+                    class="game-action-button"
+                >
+                    TAP!
+                </button>
+
+                <p id="tapMessage">
+                    Press Start to begin.
+                </p>
+
+                <button
+                    id="tapStart"
+                    class="btn btn-primary"
+                >
+                    Start Game
+                </button>
+            </div>
+        `;
+    }
+
+    if (gameName === "memoryMatch") {
+        return `
+            <div class="game-screen">
+                <p>Find all matching pairs.</p>
+
+                <div
+                    id="memoryBoard"
+                    class="memory-board"
+                ></div>
+
+                <p id="memoryMessage">
+                    Find the matching cards!
+                </p>
+            </div>
+        `;
+    }
+
+    if (gameName === "numberGuess") {
+        return `
+            <div class="game-screen">
+                <p>Guess the number between 1 and 100.</p>
+
+                <input
+                    id="guessInput"
+                    class="input"
+                    type="number"
+                    min="1"
+                    max="100"
+                    placeholder="Enter number"
+                >
+
+                <button
+                    id="guessButton"
+                    class="btn btn-primary"
+                >
+                    Guess
+                </button>
+
+                <p>
+                    Attempts:
+                    <strong id="guessAttempts">0</strong>
+                </p>
+
+                <p id="guessMessage">
+                    Good luck!
+                </p>
+
+                <button
+                    id="guessRestart"
+                    class="btn btn-secondary"
+                >
+                    New Number
+                </button>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="game-screen">
+            <p>Game coming soon!</p>
+        </div>
+    `;
+}
+
+function initializeGame(gameName) {
+    if (gameName === "tapRush") {
+        setupTapRush();
+    }
+
+    if (gameName === "memoryMatch") {
+        setupMemoryMatch();
+    }
+
+    if (gameName === "numberGuess") {
+        setupNumberGuess();
+    }
+}
+
+
+/* =========================================================
+   25. TAP RUSH
+   ========================================================= */
+
+function setupTapRush() {
+    tapRushCount = 0;
+    tapRushTime = 10;
+
+    $("#tapButton")?.addEventListener(
+        "click",
+        () => {
+            if (!tapRushTimer) return;
+
+            tapRushCount++;
+
+            const score =
+                $("#tapScore");
+
+            if (score) {
+                score.textContent =
+                    tapRushCount;
+            }
+
+            playSound("click");
+        }
     );
 
+    $("#tapStart")?.addEventListener(
+        "click",
+        startTapRush
+    );
+}
 
-  $("requestsList")
-    .classList
-    .toggle(
-      "hidden",
-      id!=="requestsList"
+function startTapRush() {
+    if (tapRushTimer) return;
+
+    tapRushCount = 0;
+    tapRushTime = 10;
+
+    $("#tapScore").textContent = "0";
+    $("#tapTimer").textContent = "10";
+    $("#tapMessage").textContent =
+        "GO! GO! GO!";
+
+    $("#tapStart").disabled = true;
+
+    tapRushTimer =
+        setInterval(() => {
+            tapRushTime--;
+
+            const timer =
+                $("#tapTimer");
+
+            if (timer) {
+                timer.textContent =
+                    tapRushTime;
+            }
+
+            if (tapRushTime <= 0) {
+                finishTapRush();
+            }
+        }, 1000);
+}
+
+function finishTapRush() {
+    clearInterval(tapRushTimer);
+
+    tapRushTimer = null;
+
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    user.gamesPlayed++;
+
+    let won = false;
+
+    if (tapRushCount >= 35) {
+        won = true;
+    }
+
+    if (won) {
+        user.gamesWon++;
+
+        addXP(50);
+
+        playSound("win");
+
+        launchConfetti();
+
+        $("#tapMessage").textContent =
+            `🏆 Amazing! You scored ${tapRushCount}!`;
+    } else {
+        addXP(15);
+
+        playSound("success");
+
+        $("#tapMessage").textContent =
+            `Nice! You scored ${tapRushCount}. Try beating 35!`;
+    }
+
+    saveData();
+
+    checkAchievements();
+
+    $("#tapStart").disabled = false;
+    $("#tapStart").textContent =
+        "Play Again";
+
+    renderEverything();
+}
+
+
+/* =========================================================
+   26. MEMORY MATCH
+   ========================================================= */
+
+function setupMemoryMatch() {
+    const symbols = [
+        "🔥",
+        "⭐",
+        "💜",
+        "🎮",
+        "🚀",
+        "⚡"
+    ];
+
+    memoryCards =
+        [...symbols, ...symbols]
+            .sort(() => Math.random() - 0.5)
+            .map((symbol, index) => ({
+                id: index,
+                symbol,
+                flipped: false,
+                matched: false
+            }));
+
+    memoryFirst = null;
+    memorySecond = null;
+    memoryLock = false;
+
+    renderMemoryBoard();
+}
+
+function renderMemoryBoard() {
+    const board =
+        $("#memoryBoard");
+
+    if (!board) return;
+
+    board.innerHTML =
+        memoryCards.map(card => `
+            <button
+                class="memory-card ${
+                    card.flipped ||
+                    card.matched
+                        ? "flipped"
+                        : ""
+                } ${
+                    card.matched
+                        ? "matched"
+                        : ""
+                }"
+                data-memory-id="${card.id}"
+            >
+                <span>
+                    ${
+                        card.flipped ||
+                        card.matched
+                            ? card.symbol
+                            : "?"
+                    }
+                </span>
+            </button>
+        `).join("");
+
+    $$(".memory-card").forEach(card => {
+        card.addEventListener(
+            "click",
+            () => {
+                flipMemoryCard(
+                    Number(
+                        card.dataset.memoryId
+                    )
+                );
+            }
+        );
+    });
+}
+
+function flipMemoryCard(id) {
+    if (memoryLock) return;
+
+    const card =
+        memoryCards.find(
+            item => item.id === id
+        );
+
+    if (!card) return;
+
+    if (
+        card.flipped ||
+        card.matched
+    ) {
+        return;
+    }
+
+    card.flipped = true;
+
+    playSound("click");
+
+    if (!memoryFirst) {
+        memoryFirst = card;
+
+        renderMemoryBoard();
+
+        return;
+    }
+
+    memorySecond = card;
+
+    renderMemoryBoard();
+
+    memoryLock = true;
+
+    setTimeout(() => {
+        if (
+            memoryFirst.symbol ===
+            memorySecond.symbol
+        ) {
+            memoryFirst.matched = true;
+            memorySecond.matched = true;
+
+            playSound("success");
+
+            $("#memoryMessage").textContent =
+                "✨ Match found!";
+        } else {
+            memoryFirst.flipped = false;
+            memorySecond.flipped = false;
+
+            $("#memoryMessage").textContent =
+                "Try again!";
+        }
+
+        memoryFirst = null;
+        memorySecond = null;
+        memoryLock = false;
+
+        renderMemoryBoard();
+
+        checkMemoryComplete();
+    }, 600);
+}
+
+function checkMemoryComplete() {
+    const complete =
+        memoryCards.every(
+            card => card.matched
+        );
+
+    if (!complete) return;
+
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    user.gamesPlayed++;
+    user.gamesWon++;
+
+    addXP(60);
+
+    saveData();
+
+    checkAchievements();
+
+    playSound("win");
+
+    launchConfetti();
+
+    $("#memoryMessage").textContent =
+        "🏆 You matched everything!";
+}
+
+
+/* =========================================================
+   27. NUMBER GUESS
+   ========================================================= */
+
+function setupNumberGuess() {
+    startNumberGuess();
+
+    $("#guessButton")?.addEventListener(
+        "click",
+        submitGuess
     );
 
+    $("#guessInput")?.addEventListener(
+        "keydown",
+        event => {
+            if (event.key === "Enter") {
+                submitGuess();
+            }
+        }
+    );
 
-  document
-    .querySelectorAll(".tabs-small button")
-    .forEach(btn=>{
-      btn.classList.remove("active");
+    $("#guessRestart")?.addEventListener(
+        "click",
+        startNumberGuess
+    );
+}
+
+function startNumberGuess() {
+    numberTarget =
+        Math.floor(
+            Math.random() * 100
+        ) + 1;
+
+    numberAttempts = 0;
+
+    if ($("#guessAttempts")) {
+        $("#guessAttempts").textContent =
+            "0";
+    }
+
+    if ($("#guessMessage")) {
+        $("#guessMessage").textContent =
+            "Good luck!";
+    }
+
+    if ($("#guessInput")) {
+        $("#guessInput").value = "";
+    }
+}
+
+function submitGuess() {
+    const input =
+        $("#guessInput");
+
+    if (!input) return;
+
+    const guess =
+        Number(input.value);
+
+    if (
+        !guess ||
+        guess < 1 ||
+        guess > 100
+    ) {
+        showToast(
+            "Enter a number from 1 to 100.",
+            "error"
+        );
+        return;
+    }
+
+    numberAttempts++;
+
+    $("#guessAttempts").textContent =
+        numberAttempts;
+
+    if (guess === numberTarget) {
+        const user = getCurrentUser();
+
+        if (user) {
+            user.gamesPlayed++;
+            user.gamesWon++;
+
+            const xp =
+                Math.max(
+                    20,
+                    80 -
+                    numberAttempts * 5
+                );
+
+            addXP(xp);
+
+            saveData();
+
+            checkAchievements();
+        }
+
+        $("#guessMessage").textContent =
+            `🎉 Correct! The number was ${numberTarget}!`;
+
+        playSound("win");
+
+        launchConfetti();
+
+        return;
+    }
+
+    if (guess < numberTarget) {
+        $("#guessMessage").textContent =
+            "📈 Too low! Try a bigger number.";
+    } else {
+        $("#guessMessage").textContent =
+            "📉 Too high! Try a smaller number.";
+    }
+
+    playSound("click");
+}
+
+
+/* =========================================================
+   28. GAME BUTTONS
+   ========================================================= */
+
+function setupGames() {
+    $$("[data-game]").forEach(card => {
+        card.addEventListener(
+            "click",
+            () => {
+                openGame(
+                    card.dataset.game
+                );
+            }
+        );
+    });
+}
+
+
+/* =========================================================
+   29. LEADERBOARD
+   ========================================================= */
+
+function getLeaderboard(type = "daily") {
+    const users = [...data.users];
+
+    if (type === "weekly") {
+        return users.sort(
+            (a, b) => b.xp - a.xp
+        );
+    }
+
+    return users.sort(
+        (a, b) => b.xp - a.xp
+    );
+}
+
+function renderLeaderboard() {
+    const container =
+        $("#leaderboardList");
+
+    if (!container) return;
+
+    const type =
+        $(".leaderboard-tab.active")
+            ?.dataset.type ||
+        "daily";
+
+    const users =
+        getLeaderboard(type);
+
+    if (!users.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                No players yet.
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML =
+        users.slice(0, 10)
+            .map((user, index) => `
+                <div class="leaderboard-row ${
+                    user.id === currentUserId
+                        ? "current-player"
+                        : ""
+                }">
+                    <div class="leaderboard-rank">
+                        ${
+                            index === 0
+                                ? "🥇"
+                                : index === 1
+                                ? "🥈"
+                                : index === 2
+                                ? "🥉"
+                                : `#${index + 1}`
+                        }
+                    </div>
+
+                    <div class="leaderboard-user">
+                        <div class="avatar">
+                            ${escapeHTML(user.avatar)}
+                        </div>
+
+                        <div>
+                            <strong>
+                                ${escapeHTML(user.name)}
+                            </strong>
+
+                            <small>
+                                Level ${user.level}
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="leaderboard-xp">
+                        ${user.xp} XP
+                    </div>
+                </div>
+            `)
+            .join("");
+}
+
+function setupLeaderboard() {
+    $$(".leaderboard-tab").forEach(tab => {
+        tab.addEventListener(
+            "click",
+            () => {
+                $$(".leaderboard-tab")
+                    .forEach(item =>
+                        item.classList.remove(
+                            "active"
+                        )
+                    );
+
+                tab.classList.add("active");
+
+                renderLeaderboard();
+            }
+        );
+    });
+}
+
+
+/* =========================================================
+   30. FRIEND ROOM
+   ========================================================= */
+
+function generateRoomCode() {
+    const chars =
+        "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    let code = "";
+
+    for (let i = 0; i < 6; i++) {
+        code += chars[
+            Math.floor(
+                Math.random() *
+                chars.length
+            )
+        ];
+    }
+
+    return code;
+}
+
+function createRoom() {
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    const code = generateRoomCode();
+
+    data.rooms.push({
+        code,
+        host: user.id,
+        members: [user.id],
+        createdAt: Date.now()
     });
 
+    saveData();
 
-  button.classList.add("active");
+    const roomCode =
+        $("#roomCode");
 
+    if (roomCode) {
+        roomCode.textContent =
+            code;
+    }
+
+    showToast(
+        `Room ${code} created!`,
+        "success"
+    );
+
+    addXP(10);
+}
+
+function joinRoom() {
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    const input =
+        $("#joinRoomInput");
+
+    if (!input) return;
+
+    const code =
+        input.value.trim().toUpperCase();
+
+    if (!code) {
+        showToast(
+            "Enter a room code.",
+            "error"
+        );
+        return;
+    }
+
+    const room =
+        data.rooms.find(
+            item => item.code === code
+        );
+
+    if (!room) {
+        showToast(
+            "Room not found.",
+            "error"
+        );
+        return;
+    }
+
+    if (!room.members.includes(user.id)) {
+        room.members.push(user.id);
+    }
+
+    saveData();
+
+    showToast(
+        `Joined room ${code}!`,
+        "success"
+    );
+
+    input.value = "";
+
+    renderRoom(room);
+}
+
+function renderRoom(room = null) {
+    const codeElement =
+        $("#roomCode");
+
+    const membersElement =
+        $("#roomMembers");
+
+    if (!codeElement) return;
+
+    if (!room) {
+        const user =
+            getCurrentUser();
+
+        room =
+            data.rooms.find(
+                item =>
+                    item.host === user?.id &&
+                    item.members.includes(
+                        user?.id
+                    )
+            );
+    }
+
+    if (!room) {
+        codeElement.textContent =
+            "------";
+
+        if (membersElement) {
+            membersElement.innerHTML =
+                "No active room";
+        }
+
+        return;
+    }
+
+    codeElement.textContent =
+        room.code;
+
+    if (membersElement) {
+        membersElement.innerHTML =
+            room.members
+                .map(id => {
+                    const member =
+                        getUserById(id);
+
+                    return member
+                        ? `<span>${escapeHTML(member.name)}</span>`
+                        : "";
+                })
+                .join("");
+    }
+}
+
+function setupRoom() {
+    $("#createRoom")?.addEventListener(
+        "click",
+        createRoom
+    );
+
+    $("#joinRoom")?.addEventListener(
+        "click",
+        joinRoom
+    );
+
+    $("#joinRoomInput")?.addEventListener(
+        "keydown",
+        event => {
+            if (event.key === "Enter") {
+                joinRoom();
+            }
+        }
+    );
+
+    $("#copyRoomCode")?.addEventListener(
+        "click",
+        async () => {
+            const code =
+                $("#roomCode")?.textContent;
+
+            if (!code || code === "------") {
+                showToast(
+                    "Create a room first.",
+                    "error"
+                );
+                return;
+            }
+
+            await copyText(code);
+
+            showToast(
+                "Room code copied!",
+                "success"
+            );
+        }
+    );
 }
 
 
-/* ================= BEST FRIENDS ================= */
+/* =========================================================
+   31. PROFILE
+   ========================================================= */
 
-function renderBestFriends(){
+function renderProfile() {
+    const user = getCurrentUser();
 
-  const box =
-    $("bestFriendsList");
+    if (!user) return;
 
-  if(!box)
-    return;
-
-
-  const best =
-    state.friends.filter(
-      friend =>
-        state.bestFriends
-        .includes(friend.friendId)
+    setText(
+        "#profileName",
+        user.name
     );
 
+    setText(
+        "#profileEmail",
+        user.email
+    );
 
-  if(best.length===0){
+    setText(
+        "#profileFriendId",
+        user.friendId
+    );
 
-    box.innerHTML = `
+    setText(
+        "#profileLevel",
+        user.level
+    );
 
-      <div class="empty">
+    setText(
+        "#profileXP",
+        user.xp
+    );
 
-        Your Best Friends list is empty.<br><br>
+    setText(
+        "#profileStreak",
+        user.streak
+    );
 
-        Add someone to Best Friends
-        from your Friends list.
+    setText(
+        "#profileFriends",
+        user.friends.length
+    );
 
-      </div>
+    setText(
+        "#profileGames",
+        user.gamesPlayed
+    );
+}
 
+function setText(selector, value) {
+    const element =
+        $(selector);
+
+    if (element) {
+        element.textContent =
+            value ?? "";
+    }
+}
+
+async function copyText(text) {
+    try {
+        await navigator.clipboard.writeText(
+            text
+        );
+    } catch {
+        const textarea =
+            document.createElement("textarea");
+
+        textarea.value = text;
+
+        document.body.appendChild(
+            textarea
+        );
+
+        textarea.select();
+
+        document.execCommand("copy");
+
+        textarea.remove();
+    }
+}
+
+function setupProfile() {
+    $("#copyFriendId")?.addEventListener(
+        "click",
+        async () => {
+            const user =
+                getCurrentUser();
+
+            if (!user) return;
+
+            await copyText(
+                user.friendId
+            );
+
+            showToast(
+                "Friend ID copied!",
+                "success"
+            );
+
+            playSound("success");
+        }
+    );
+
+    $("#logoutButton")?.addEventListener(
+        "click",
+        logout
+    );
+}
+
+
+/* =========================================================
+   32. HOME STATS
+   ========================================================= */
+
+function renderHome() {
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    setText(
+        "#welcomeName",
+        user.name
+    );
+
+    setText(
+        "#friendCount",
+        user.friends.length
+    );
+
+    setText(
+        "#bestFriendCount",
+        user.bestFriends.length
+    );
+
+    setText(
+        "#xpCount",
+        user.xp
+    );
+
+    setText(
+        "#streakCount",
+        user.streak
+    );
+
+    renderThoughts();
+    renderAchievements();
+}
+
+function renderThoughts() {
+    const container =
+        $("#thoughtsList");
+
+    if (!container) return;
+
+    const allThoughts = [];
+
+    data.users.forEach(user => {
+        if (!user.thoughts) return;
+
+        user.thoughts.forEach(
+            thought => {
+                allThoughts.push({
+                    ...thought,
+                    user
+                });
+            }
+        );
+    });
+
+    allThoughts.sort(
+        (a, b) =>
+            b.createdAt -
+            a.createdAt
+    );
+
+    if (!allThoughts.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                💭 No thoughts yet. Be the first!
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML =
+        allThoughts
+            .slice(0, 8)
+            .map(item => `
+                <div class="thought-card">
+                    <div class="thought-avatar">
+                        ${escapeHTML(item.user.avatar)}
+                    </div>
+
+                    <div class="thought-content">
+                        <strong>
+                            ${escapeHTML(item.user.name)}
+                        </strong>
+
+                        <p>
+                            ${escapeHTML(item.text)}
+                        </p>
+
+                        <small>
+                            ${timeAgo(item.createdAt)}
+                        </small>
+                    </div>
+                </div>
+            `)
+            .join("");
+}
+
+function renderAchievements() {
+    const container =
+        $("#achievementsList");
+
+    if (!container) return;
+
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    container.innerHTML =
+        ACHIEVEMENTS
+            .map(achievement => {
+                const unlocked =
+                    user.achievements.includes(
+                        achievement.id
+                    );
+
+                return `
+                    <div class="achievement-card ${
+                        unlocked
+                            ? "unlocked"
+                            : "locked"
+                    }">
+
+                        <div class="achievement-icon">
+                            ${achievement.icon}
+                        </div>
+
+                        <div>
+                            <strong>
+                                ${escapeHTML(
+                                    achievement.title
+                                )}
+                            </strong>
+
+                            <p>
+                                ${escapeHTML(
+                                    achievement.description
+                                )}
+                            </p>
+                        </div>
+
+                    </div>
+                `;
+            })
+            .join("");
+}
+
+function timeAgo(timestamp) {
+    const seconds =
+        Math.floor(
+            (Date.now() - timestamp) /
+            1000
+        );
+
+    if (seconds < 60) {
+        return "just now";
+    }
+
+    const minutes =
+        Math.floor(seconds / 60);
+
+    if (minutes < 60) {
+        return `${minutes}m ago`;
+    }
+
+    const hours =
+        Math.floor(minutes / 60);
+
+    if (hours < 24) {
+        return `${hours}h ago`;
+    }
+
+    const days =
+        Math.floor(hours / 24);
+
+    return `${days}d ago`;
+}
+
+
+/* =========================================================
+   33. FRIENDS PAGE
+   ========================================================= */
+
+function renderFriends() {
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    renderMyFriends(user);
+    renderFriendRequests(user);
+    renderBestFriends(user);
+}
+
+function renderMyFriends(user) {
+    const container =
+        $("#friendsList");
+
+    if (!container) return;
+
+    if (!user.friends.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">👥</div>
+
+                <h3>No Friends Yet</h3>
+
+                <p>
+                    Start by sending a Friend ID request.
+                </p>
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML =
+        user.friends
+            .map(friendId => {
+                const friend =
+                    getUserById(friendId);
+
+                if (!friend) return "";
+
+                return `
+                    <div class="friend-card">
+
+                        <div class="friend-avatar">
+                            ${escapeHTML(friend.avatar)}
+                        </div>
+
+                        <div class="friend-info">
+                            <strong>
+                                ${escapeHTML(friend.name)}
+                            </strong>
+
+                            <span>
+                                ${escapeHTML(friend.friendId)}
+                            </span>
+
+                            <small>
+                                Level ${friend.level}
+                            </small>
+                        </div>
+
+                        <div class="friend-actions">
+
+                            <button
+                                class="btn btn-small"
+                                data-best-friend="${friend.id}"
+                            >
+                                ${
+                                    isBestFriend(
+                                        user,
+                                        friend.id
+                                    )
+                                        ? "⭐ Best"
+                                        : "☆ Best"
+                                }
+                            </button>
+
+                            <button
+                                class="btn btn-small btn-danger"
+                                data-remove-friend="${friend.id}"
+                            >
+                                Remove
+                            </button>
+
+                        </div>
+
+                    </div>
+                `;
+            })
+            .join("");
+}
+
+function renderFriendRequests(user) {
+    const container =
+        $("#friendRequestsList");
+
+    if (!container) return;
+
+    const requests =
+        data.friendRequests.filter(
+            request =>
+                request.to === user.id &&
+                request.status === "pending"
+        );
+
+    if (!requests.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                📭 No pending friend requests.
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML =
+        requests
+            .map(request => {
+                const sender =
+                    getUserById(
+                        request.from
+                    );
+
+                if (!sender) return "";
+
+                return `
+                    <div class="request-card">
+
+                        <div class="friend-avatar">
+                            ${escapeHTML(sender.avatar)}
+                        </div>
+
+                        <div class="friend-info">
+                            <strong>
+                                ${escapeHTML(sender.name)}
+                            </strong>
+
+                            <span>
+                                ${escapeHTML(sender.friendId)}
+                            </span>
+                        </div>
+
+                        <div class="request-actions">
+
+                            <button
+                                class="btn btn-primary btn-small"
+                                data-accept-request="${request.id}"
+                            >
+                                Accept
+                            </button>
+
+                            <button
+                                class="btn btn-danger btn-small"
+                                data-reject-request="${request.id}"
+                            >
+                                Reject
+                            </button>
+
+                        </div>
+
+                    </div>
+                `;
+            })
+            .join("");
+}
+
+function renderBestFriends(user) {
+    const container =
+        $("#bestFriendsList");
+
+    if (!container) return;
+
+    if (!user.bestFriends.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                ⭐ Your Best Friends circle is empty.
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML =
+        user.bestFriends
+            .map(friendId => {
+                const friend =
+                    getUserById(friendId);
+
+                if (!friend) return "";
+
+                return `
+                    <div class="best-friend-card">
+
+                        <div class="best-friend-star">
+                            ⭐
+                        </div>
+
+                        <div class="friend-avatar">
+                            ${escapeHTML(friend.avatar)}
+                        </div>
+
+                        <div class="friend-info">
+                            <strong>
+                                ${escapeHTML(friend.name)}
+                            </strong>
+
+                            <span>
+                                ${escapeHTML(friend.friendId)}
+                            </span>
+                        </div>
+
+                        <button
+                            class="btn btn-small"
+                            data-best-friend="${friend.id}"
+                        >
+                            Remove
+                        </button>
+
+                    </div>
+                `;
+            })
+            .join("");
+}
+
+
+/* =========================================================
+   34. THOUGHT INPUT
+   ========================================================= */
+
+function setupThoughts() {
+    $("#postThought")?.addEventListener(
+        "click",
+        addThought
+    );
+
+    $("#thoughtInput")?.addEventListener(
+        "keydown",
+        event => {
+            if (
+                event.key === "Enter" &&
+                !event.shiftKey
+            ) {
+                event.preventDefault();
+
+                addThought();
+            }
+        }
+    );
+}
+
+
+/* =========================================================
+   35. COPY / GENERAL BUTTONS
+   ========================================================= */
+
+function setupGeneralButtons() {
+    $$("[data-close-modal]").forEach(
+        button => {
+            button.addEventListener(
+                "click",
+                () => {
+                    closeModal(
+                        button.closest(".modal")
+                    );
+                }
+            );
+        }
+    );
+
+    $$(".modal").forEach(modal => {
+        modal.addEventListener(
+            "click",
+            event => {
+                if (
+                    event.target === modal
+                ) {
+                    closeModal(modal);
+                }
+            }
+        );
+    });
+
+    document.addEventListener(
+        "keydown",
+        event => {
+            if (event.key === "Escape") {
+                $$(".modal.active").forEach(
+                    modal =>
+                        closeModal(modal)
+                );
+            }
+        }
+    );
+}
+
+
+/* =========================================================
+   36. CONFETTI
+   ========================================================= */
+
+function launchConfetti() {
+    const container =
+        document.createElement("div");
+
+    container.className =
+        "confetti-container";
+
+    document.body.appendChild(
+        container
+    );
+
+    const symbols = [
+        "✨",
+        "🎉",
+        "⭐",
+        "💜",
+        "🔥",
+        "⚡"
+    ];
+
+    for (let i = 0; i < 35; i++) {
+        const piece =
+            document.createElement("span");
+
+        piece.className =
+            "confetti-piece";
+
+        piece.textContent =
+            symbols[
+                Math.floor(
+                    Math.random() *
+                    symbols.length
+                )
+            ];
+
+        piece.style.left =
+            `${Math.random() * 100}%`;
+
+        piece.style.animationDelay =
+            `${Math.random() * 0.7}s`;
+
+        piece.style.fontSize =
+            `${12 + Math.random() * 16}px`;
+
+        container.appendChild(
+            piece
+        );
+    }
+
+    setTimeout(() => {
+        container.remove();
+    }, 2500);
+}
+
+
+/* =========================================================
+   37. ADDITIONAL CONFETTI CSS
+   ========================================================= */
+
+function injectConfettiCSS() {
+    if ($("#friendzoneConfettiCSS")) {
+        return;
+    }
+
+    const style =
+        document.createElement("style");
+
+    style.id =
+        "friendzoneConfettiCSS";
+
+    style.textContent = `
+        .confetti-container {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 99999;
+            overflow: hidden;
+        }
+
+        .confetti-piece {
+            position: absolute;
+            top: -40px;
+            animation:
+                friendzoneConfettiFall
+                2.2s ease-out
+                forwards;
+        }
+
+        @keyframes friendzoneConfettiFall {
+            0% {
+                transform:
+                    translateY(0)
+                    rotate(0deg);
+                opacity: 1;
+            }
+
+            100% {
+                transform:
+                    translateY(110vh)
+                    rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
     `;
 
-    return;
-
-  }
-
-
-  box.innerHTML =
-    best
-    .map(friend=>`
-
-      <div class="friend-card">
-
-        <div class="avatar">
-          💜
-        </div>
-
-        <div class="friend-info">
-
-          <b>
-            ${friend.name}
-          </b>
-
-          <small>
-            ${friend.friendId}
-          </small>
-
-        </div>
-
-
-        <button
-          class="secondary"
-          onclick="startChat('${friend.friendId}')">
-
-          Chat
-
-        </button>
-
-
-        <button
-          class="danger"
-          onclick="makeBestFriend('${friend.friendId}')">
-
-          Remove Best
-
-        </button>
-
-      </div>
-
-    `)
-    .join("");
-
-}
-
-
-/* ================= CHAT ================= */
-
-function renderChat(){
-
-  const box =
-    $("chatFriends");
-
-  if(!box)
-    return;
-
-
-  if(state.friends.length===0){
-
-    box.innerHTML =
-      `<div class="empty">
-        Add friends first.
-      </div>`;
-
-    return;
-
-  }
-
-
-  box.innerHTML =
-    state.friends
-    .map(friend=>`
-
-      <div
-        class="chat-person ${
-          currentChat===friend.friendId
-          ? "active"
-          : ""
-        }"
-        onclick="startChat('${friend.friendId}')">
-
-        <div class="avatar">
-          ${friend.name.charAt(0)}
-        </div>
-
-        <b>
-          ${friend.name}
-        </b>
-
-      </div>
-
-    `)
-    .join("");
-
-
-  if(currentChat){
-
-    renderMessages();
-
-  }
-
-}
-
-
-function startChat(id){
-
-  if(
-    !state.friends.some(
-      friend =>
-        friend.friendId===id
-    )
-  ){
-
-    toast(
-      "Chat is only available with friends."
+    document.head.appendChild(
+        style
     );
-
-    return;
-
-  }
-
-
-  currentChat=id;
-
-  openPage("chat");
-
-  renderChat();
-
-  renderMessages();
-
 }
 
 
-function renderMessages(){
+/* =========================================================
+   38. GLOBAL RENDER
+   ========================================================= */
 
-  const friend =
-    state.friends.find(
-      f=>f.friendId===currentChat
-    );
+function renderEverything() {
+    const user = getCurrentUser();
 
+    if (!user) return;
 
-  if(!friend)
-    return;
+    checkAchievements();
 
+    renderHome();
+    renderFriends();
+    renderLeaderboard();
+    renderProfile();
+    renderRoom();
 
-  $("chatHeader").textContent =
-    friend.name;
-
-
-  const list =
-    state.messages[currentChat] || [];
-
-
-  if(list.length===0){
-
-    $("messages").innerHTML =
-      `<div class="empty">
-        No messages yet.<br>
-        Say hello 👋
-      </div>`;
-
-    return;
-
-  }
-
-
-  $("messages").innerHTML =
-    list
-    .map(message=>`
-
-      <div class="bubble ${
-        message.me ? "me" : ""
-      }">
-
-        ${escapeHTML(message.text)}
-
-      </div>
-
-    `)
-    .join("");
-
-
-  $("messages").scrollTop =
-    $("messages").scrollHeight;
-
+    updateNavBadges();
 }
 
-
-function sendMessage(){
-
-  if(!currentChat){
-
-    toast(
-      "Select a friend first."
-    );
-
-    return;
-
-  }
-
-
-  const input =
-    $("messageInput");
-
-
-  const text =
-    input.value.trim();
-
-
-  if(!text)
-    return;
-
-
-  if(!state.messages[currentChat]){
-
-    state.messages[currentChat]=[];
-
-  }
-
-
-  state.messages[currentChat].push({
-
-    text:text,
-
-    me:true
-
-  });
-
-
-  input.value="";
-
-  save();
-
-  renderMessages();
-
-}
-
-
-function escapeHTML(text){
-
-  return text.replace(
-    /[&<>"']/g,
-
-    char => ({
-
-      "&":"&amp;",
-      "<":"&lt;",
-      ">":"&gt;",
-      '"':"&quot;",
-      "'":"&#039;"
-
-    }[char])
-
-  );
-
-}
-
-
-/* ================= GAMES ================= */
-
-function gameCard(game){
-
-  return `
-
-    <div class="game-card">
-
-      <div>
-
-        <div class="game-icon">
-          ${game.icon}
-        </div>
-
-        <h3>
-          ${game.name}
-        </h3>
-
-        <p>
-          ${game.description}
-          • ${game.players}
-        </p>
-
-      </div>
-
-
-      <button
-        class="primary"
-        onclick="openGame('${game.id}')">
-
-        Play
-
-      </button>
-
-    </div>
-
-  `;
-
-}
-
-
-function renderGames(){
-
-  $("gamesGrid").innerHTML =
-    games
-    .map(gameCard)
-    .join("");
-
-}
-
-
-function openGame(id){
-
-  currentGame =
-    games.find(
-      game=>game.id===id
-    );
-
-
-  openPage("game");
-
-
-  $("gameDetails").innerHTML = `
-
-    <div class="game-detail">
-
-      <div class="game-icon">
-        ${currentGame.icon}
-      </div>
-
-      <small>
-        GAME
-      </small>
-
-      <h1>
-        ${currentGame.name}
-      </h1>
-
-      <p>
-        ${currentGame.description}
-      </p>
-
-
-      <div class="mode-grid">
-
-
-        <button
-          class="mode"
-          onclick="playSolo()">
-
-          <b>
-            🎯 Play Solo
-          </b>
-
-          <span>
-            Play by yourself and practice.
-          </span>
-
-        </button>
-
-
-        <button
-          class="mode"
-          onclick="randomMatch()">
-
-          <b>
-            ⚡ Random Match
-          </b>
-
-          <span>
-            Find an available opponent automatically.
-          </span>
-
-        </button>
-
-
-        <button
-          class="mode"
-          onclick="openPrivateRoom()">
-
-          <b>
-            🔐 Private Room
-          </b>
-
-          <span>
-            Create a room and invite friends.
-          </span>
-
-        </button>
-
-
-      </div>
-
-    </div>
-
-  `;
-
-}
-
-
-function playSolo(){
-
-  state.score += 5;
-
-  save();
-
-  renderLeaderboard();
-
-  toast(
-    `${currentGame.name} started! +5 points`
-  );
-
-}
-
-
-function randomMatch(){
-
-  toast(
-    "Searching for an available opponent..."
-  );
-
-
-  setTimeout(()=>{
-
-    toast(
-      "Opponent found! Match ready."
-    );
-
-  },1200);
-
-}
-
-
-function openPrivateRoom(){
-
-  openPage("rooms");
-
-  createRoom(
-    currentGame
-    ? currentGame.name
-    : "Game"
-  );
-
-}
-
-
-/* ================= ROOMS ================= */
-
-function createRoom(gameName="Game"){
-
-  const code =
-    "FZ-" +
-    Math.random()
-    .toString(36)
-    .substring(2,7)
-    .toUpperCase();
-
-
-  state.rooms.push({
-
-    code:code,
-
-    game:gameName,
-
-    owner:state.account.name,
-
-    members:[
-      state.account.friendId
-    ]
-
-  });
-
-
-  save();
-
-  renderRooms();
-
-  updateUI();
-
-  toast(
-    "Room created: " + code
-  );
-
-}
-
-
-function joinRoom(){
-
-  const code =
-    $("roomCode")
-    .value
-    .trim()
-    .toUpperCase();
-
-
-  const room =
-    state.rooms.find(
-      r=>r.code===code
-    );
-
-
-  if(!room){
-
-    toast("Room not found.");
-
-    return;
-
-  }
-
-
-  if(
-    !room.members.includes(
-      state.account.friendId
-    )
-  ){
-
-    room.members.push(
-      state.account.friendId
-    );
-
-  }
-
-
-  save();
-
-  renderRooms();
-
-  toast(
-    "Joined room " + code
-  );
-
-}
-
-
-function renderRooms(){
-
-  const box =
-    $("roomsList");
-
-  if(!box)
-    return;
-
-
-  if(state.rooms.length===0){
-
-    box.innerHTML =
-      `<div class="empty">
-        No private rooms yet.<br>
-        Create one and invite your friends.
-      </div>`;
-
-    return;
-
-  }
-
-
-  box.innerHTML =
-    state.rooms
-    .map(room=>`
-
-      <div class="room-card">
-
-        <div>
-
-          <b>
-            ${room.game}
-          </b>
-
-          <small>
-
-            <br>
-
-            Room:
-            ${room.code}
-
-            •
-            ${room.members.length}
-            player(s)
-
-          </small>
-
-        </div>
-
-
-        <button
-          class="primary"
-          onclick="enterRoom('${room.code}')">
-
-          Enter
-
-        </button>
-
-      </div>
-
-    `)
-    .join("");
-
-}
-
-
-function enterRoom(code){
-
-  toast(
-    "Room " + code + " is ready!"
-  );
-
-}
-
-
-/* ================= COMPETITIONS ================= */
-
-function joinCompetition(){
-
-  state.score += 10;
-
-  save();
-
-  renderLeaderboard();
-
-  toast(
-    "Joined competition! +10 points"
-  );
-
-}
-
-
-function renderLeaderboard(){
-
-  const box =
-    $("leaderboard");
-
-  if(!box)
-    return;
-
-
-  const people = [
-
-    {
-
-      name:
-        state.account
-        ? state.account.name
-        : "You",
-
-      score:
-        state.score || 0
-
+function updateNavBadges() {
+    const user = getCurrentUser();
+
+    if (!user) return;
+
+    const requestCount =
+        data.friendRequests.filter(
+            request =>
+                request.to === user.id &&
+                request.status === "pending"
+        ).length;
+
+    const badge =
+        $("#friendRequestBadge");
+
+    if (badge) {
+        badge.textContent =
+            requestCount;
+
+        badge.classList.toggle(
+            "hidden",
+            requestCount === 0
+        );
     }
-
-  ];
-
-
-  state.friends.forEach(
-    (friend,index)=>{
-
-      people.push({
-
-        name:friend.name,
-
-        score:
-          Math.max(
-            0,
-            80-(index*13)
-          )
-
-      });
-
-    }
-  );
-
-
-  people.sort(
-    (a,b)=>b.score-a.score
-  );
-
-
-  box.innerHTML =
-    people
-    .map(
-      (person,index)=>`
-
-        <div class="rank">
-
-          <strong>
-            #${index+1}
-          </strong>
-
-          <span>
-            ${person.name}
-          </span>
-
-          <b>
-            ${person.score} pts
-          </b>
-
-        </div>
-
-      `
-    )
-    .join("");
-
 }
 
 
-/* ================= PROFILE ================= */
+/* =========================================================
+   39. STARTUP
+   ========================================================= */
 
-function renderProfile(){
+function initializeFriendZone() {
+    injectConfettiCSS();
 
-  if(!state.account)
-    return;
+    setupAuthentication();
+    setupNavigation();
+    setupMobileNavigation();
 
+    setupTheme();
+    setupSound();
 
-  $("profileName").textContent =
-    state.account.name;
+    setupFriendSystem();
+    setupGames();
+    setupLeaderboard();
 
+    setupRoom();
+    setupProfile();
 
-  $("profileEmail").textContent =
-    state.account.email;
+    setupThoughts();
+    setupGeneralButtons();
 
+    const user =
+        getCurrentUser();
 
-  $("profileID").textContent =
-    state.account.friendId;
-
-
-  $("bigAvatar").textContent =
-    state.account.name
-    .charAt(0)
-    .toUpperCase();
-
+    if (user) {
+        updateStreak(user);
+        showApp();
+    } else {
+        showAuth();
+    }
 }
 
 
-/* ================= START ================= */
+/* =========================================================
+   40. DOM READY
+   ========================================================= */
 
-window.addEventListener(
-  "load",
-  ()=>{
-
-    if(
-      state.loggedIn &&
-      state.account
-    ){
-
-      $("navbar")
-        .classList
-        .remove("hidden");
-
-      enterApp();
-
-    }else{
-
-      showAuth("login");
-
-      createCaptcha();
-
-    }
-
-  }
-);
+if (
+    document.readyState ===
+    "loading"
+) {
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeFriendZone
+    );
+} else {
+    initializeFriendZone();
+}
