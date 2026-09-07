@@ -1921,3 +1921,199 @@ main {
     }
 
 }
+
+
+
+
+/* =========================================
+   BEST FRIEND CARDS
+========================================= */
+
+.request-list,
+.best-friends-list {
+
+    display: grid;
+
+    gap: 12px;
+}
+
+
+.friend-request,
+.best-friend-card {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 15px;
+
+    padding: 17px;
+
+    border-radius: 16px;
+
+    background: var(--card);
+
+    border: 1px solid var(--border);
+}
+
+
+.request-user {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+}
+
+
+.mini-avatar,
+.best-avatar {
+
+    width: 45px;
+    height: 45px;
+
+    display: grid;
+
+    place-items: center;
+
+    border-radius: 50%;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(155,92,255,0.25),
+            rgba(236,72,153,0.25)
+        );
+
+    font-size: 20px;
+}
+
+
+.request-user strong {
+
+    display: block;
+
+    font-size: 13px;
+}
+
+
+.request-user small {
+
+    display: block;
+
+    color: var(--muted);
+
+    margin-top: 3px;
+
+    font-size: 9px;
+}
+
+
+.request-actions {
+
+    display: flex;
+
+    gap: 7px;
+}
+
+
+.accept-button,
+.reject-button {
+
+    border: 0;
+
+    border-radius: 9px;
+
+    padding: 9px 12px;
+
+    cursor: pointer;
+
+    font-size: 11px;
+
+    font-weight: 800;
+}
+
+
+.accept-button {
+
+    color: #86efac;
+
+    background: rgba(34,197,94,0.1);
+}
+
+
+.reject-button {
+
+    color: #ff8095;
+
+    background: rgba(255,77,109,0.1);
+}
+
+
+.best-friend-card {
+
+    justify-content: flex-start;
+}
+
+
+.best-info {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 4px;
+}
+
+
+.best-info strong {
+
+    font-size: 14px;
+}
+
+
+.best-info small {
+
+    color: #fb7185;
+
+    font-size: 9px;
+}
+
+
+.best-info span {
+
+    color: var(--muted);
+
+    font-size: 9px;
+
+    letter-spacing: 0.5px;
+}
+
+
+.preview-friend {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    flex-direction: column;
+
+    gap: 7px;
+
+    margin: 5px 12px;
+}
+
+
+.preview-friend strong {
+
+    font-size: 10px;
+}
+
+
+.best-friends-preview {
+
+    flex-wrap: wrap;
+}
