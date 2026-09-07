@@ -844,13 +844,10 @@ function signIn() {
         return;
     }
 
-const user = db.users.find(
-    item =>
-        item &&
-        typeof item.email === "string" &&
-        item.email.trim().toLowerCase() === email
-);
-    
+
+   const user = db.users.find(
+    item => item.email.toLowerCase() === email
+); 
 
 
     if (!user) {
@@ -947,14 +944,7 @@ function signUp() {
     }
 
 
-    if (
-    db.users.some(
-        user =>
-            user &&
-            typeof user.email === "string" &&
-            user.email.trim().toLowerCase() === email
-    )
-) {
+    if (db.users.some(user => user.email.toLowerCase() === email)) {
         showToast(
             "An account with this email already exists.",
             "error"
