@@ -11,9 +11,9 @@
    ========================================================= */
 
 const STORAGE_KEY = "friendzone_database_v5";
-const CURRENT_USER_KEY = "friendzone_current_user_v4";
-const THEME_KEY = "friendzone_theme_v4";
-const SOUND_KEY = "friendzone_sound_v4";
+const CURRENT_USER_KEY = "friendzone_current_user_v5";
+const THEME_KEY = "friendzone_theme_v5";
+const SOUND_KEY = "friendzone_sound_v5";
 
 let db = loadDatabase();
 let currentUserId = localStorage.getItem(CURRENT_USER_KEY);
