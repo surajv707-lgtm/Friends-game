@@ -434,8 +434,11 @@ function signIn() {
     }
 
     const user = db.users.find(
-        item => item.email.toLowerCase() === email
-    );
+    item =>
+        item &&
+        typeof item.email === "string" &&
+        item.email.trim().toLowerCase() === email
+);
 
     if (!user) {
         showToast("No account found with this email.", "error");
@@ -480,7 +483,14 @@ function signUp() {
         return;
     }
 
-    if (db.users.some(user => user.email.toLowerCase() === email)) {
+    if (
+    db.users.some(
+        user =>
+            user &&
+            typeof user.email === "string" &&
+            user.email.trim().toLowerCase() === email
+    )
+) {
         showToast("An account with this email already exists.", "error");
         playSound("error");
         return;
