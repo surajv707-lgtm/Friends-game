@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>FriendZone 🎮</title>
+
+    <meta name="description"
+          content="FriendZone - Play games, challenge friends and have fun!">
+
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Press+Start+2P&display=swap"
+          rel="stylesheet">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<!-- =========================
+     BACKGROUND EFFECTS
+========================= -->
+
+<div class="background-effects">
+    <div class="glow glow-1"></div>
+    <div class="glow glow-2"></div>
+    <div class="glow glow-3"></div>
+</div>
+
+
+<!-- =========================
+     NAVIGATION
+========================= -->
+
+<header class="navbar">
+
+    <div class="logo" onclick="showHome()">
+        <span>🎮</span>
+        <strong>FriendZone</strong>
+    </div>
+
+    <nav>
+        <button onclick="showHome()">Home</button>
+        <button onclick="showGames()">Games</button>
+        <button onclick="showFriends()">Friends</button>
+        <button onclick="showLeaderboard()">🏆</button>
+    </nav>
+
+    <button class="profile-button" onclick="openProfile()">
+        👤
+    </button>
+
+</header>
+
+
+<!-- =========================
+     MAIN APP
+========================= -->
+
+<main id="app">
+
+
+<!-- =========================
+     HOME PAGE
+========================= -->
+
+<section id="homePage" class="page active">
+
+    <div class="hero">
+
+        <div class="hero-badge">
+            🔥 YOUR FRIEND GROUP'S PLAYGROUND
+        </div>
+
+        <h1>
+            PLAY.<br>
+            <span>LAUGH.</span><br>
+            REPEAT.
+        </h1>
+
+        <p>
+            Games, challenges, roasts and chaos.
+            Everything your friend group needs in one place.
+        </p>
+
+        <div class="hero-buttons">
+
+            <button class="primary-button"
+                    onclick="showGames()">
+                🎮 PLAY NOW
+            </button>
+
+            <button class="secondary-button"
+                    onclick="openProfile()">
+                👤 Create Profile
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         FRIEND THOUGHT
+    ========================= -->
+
+    <div class="thought-card">
+
+        <div class="thought-icon">
+            💭
+        </div>
+
+        <div>
+
+            <small>FRIEND'S THOUGHT</small>
+
+            <h3 id="friendThought">
+                "Bro said he'll play for 5 minutes..."
+            </h3>
+
+            <p id="thoughtAuthor">
+                — Your Friend 😂
+            </p>
+
+        </div>
+
+        <button onclick="newThought()">
+            🔄
+        </button>
+
+    </div>
+
+
+    <!-- =========================
+         SQUAD
+    ========================= -->
+
+    <section class="section">
+
+        <div class="section-title">
+
+            <div>
+                <small>YOUR PEOPLE</small>
+                <h2>👥 The Squad</h2>
+            </div>
+
+            <button onclick="openProfile()">
+                + Add Friend
+            </button>
+
+        </div>
+
+
+        <div id="squadContainer" class="squad">
+
+            <!-- Friends will be added by JavaScript -->
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         FEATURED GAMES
+    ========================= -->
+
+    <section class="section">
+
+        <div class="section-title">
+
+            <div>
+                <small>WHAT'S HOT</small>
+                <h2>🔥 Featured Games</h2>
+            </div>
+
+            <button onclick="showGames()">
+                See All →
+            </button>
+
+        </div>
+
+
+        <div class="games-grid">
+
+            <div class="game-card purple"
+                 onclick="openGame('tictactoe')">
+
+                <div class="game-icon">
+                    ❌⭕
+                </div>
+
+                <div class="game-info">
+                    <h3>Tic Tac Toe</h3>
+                    <p>Classic 2-player battle</p>
+                </div>
+
+                <span>→</span>
+
+            </div>
+
+
+            <div class="game-card red"
+                 onclick="openGame('rps')">
+
+                <div class="game-icon">
+                    ✊
+                </div>
+
+                <div class="game-info">
+                    <h3>Rock Paper Scissors</h3>
+                    <p>Beat your opponent</p>
+                </div>
+
+                <span>→</span>
+
+            </div>
+
+
+            <div class="game-card green"
+                 onclick="openGame('reaction')">
+
+                <div class="game-icon">
+                    🎯
+                </div>
+
+                <div class="game-info">
+                    <h3>Reaction Test</h3>
+                    <p>How fast are you?</p>
+                </div>
+
+                <span>→</span>
+
+            </div>
+
+
+            <div class="game-card blue"
+                 onclick="openGame('memory')">
+
+                <div class="game-icon">
+                    🧠
+                </div>
+
+                <div class="game-info">
+                    <h3>Memory Master</h3>
+                    <p>Test your brain</p>
+                </div>
+
+                <span>→</span>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         STATS
+    ========================= -->
+
+    <section class="stats-card">
+
+        <div>
+            <strong id="gamesPlayed">0</strong>
+            <span>Games Played</span>
+        </div>
+
+        <div>
+            <strong id="totalScore">0</strong>
+            <span>Total Score</span>
+        </div>
+
+        <div>
+            <strong id="wins">0</strong>
+            <span>Wins</span>
+        </div>
+
+    </section>
+
+</section>
+
+
+<!-- =========================
+     GAMES PAGE
+========================= -->
+
+<section id="gamesPage" class="page">
+
+    <div class="page-heading">
+
+        <small>CHOOSE YOUR BATTLE</small>
+
+        <h1>🎮 Game Zone</h1>
+
+        <p>
+            Pick a game and destroy your friends.
+        </p>
+
+    </div>
+
+
+    <div class="all-games-grid">
+
+
+        <div class="game-card purple"
+             onclick="openGame('tictactoe')">
+
+            <div class="game-icon">❌⭕</div>
+
+            <h3>Tic Tac Toe</h3>
+
+            <p>Classic battle</p>
+
+            <button>PLAY</button>
+
+        </div>
+
+
+        <div class="game-card red"
+             onclick="openGame('rps')">
+
+            <div class="game-icon">✊</div>
+
+            <h3>Rock Paper Scissors</h3>
+
+            <p>Choose wisely</p>
+
+            <button>PLAY</button>
+
+        </div>
+
+
+        <div class="game-card green"
+             onclick="openGame('reaction')">
+
+            <div class="game-icon">🎯</div>
+
+            <h3>Reaction Test</h3>
+
+            <p>Test your speed</p>
+
+            <button>PLAY</button>
+
+        </div>
+
+
+        <div class="game-card blue"
+             onclick="openGame('memory')">
+
+            <div class="game-icon">🧠</div>
+
+            <h3>Memory Master</h3>
+
+            <p>Train your brain</p>
+
+            <button>PLAY</button>
+
+        </div>
+
+
+        <div class="game-card orange"
+             onclick="openGame('guess')">
+
+            <div class="game-icon">🔢</div>
+
+            <h3>Guess Number</h3>
+
+            <p>Can you guess it?</p>
+
+            <button>PLAY</button>
+
+        </div>
+
+
+        <div class="game-card lime"
+             onclick="openGame('snake')">
+
+            <div class="game-icon">🐍</div>
+
+            <h3>Snake</h3>
+
+            <p>Don't hit yourself</p>
+
+            <button>PLAY</button>
+
+        </div>
+
+
+        <div class="game-card gold"
+             onclick="openGame('dice')">
+
+            <div class="game-icon">🎲</div>
+
+            <h3>Dice Battle</h3>
+
+            <p>Luck decides</p>
+
+            <button>PLAY</button>
+
+        </div>
+
+
+        <div class="game-card pink"
+             onclick="openGame('roast')">
+
+            <div class="game-icon">😂</div>
+
+            <h3>Roast Me</h3>
+
+            <p>Prepare yourself 💀</p>
+
+            <button>PLAY</button>
+
+        </div>
+
+
+        <div class="game-card heart"
+             onclick="openGame('friendship')">
+
+            <div class="game-icon">❤️</div>
+
+            <h3>Friendship Test</h3>
+
+            <p>How strong is your bond?</p>
+
+            <button>PLAY</button>
+
+        </div>
+
+
+        <div class="game-card violet"
+             onclick="openGame('future')">
+
+            <div class="game-icon">🔮</div>
+
+            <h3>Future Generator</h3>
+
+            <p>See your destiny</p>
+
+            <button>PLAY</button>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =========================
+     FRIENDS PAGE
+========================= -->
+
+<section id="friendsPage" class="page">
+
+    <div class="page-heading">
+
+        <small>YOUR CREW</small>
+
+        <h1>👥 Friends</h1>
+
+        <p>
+            Your squad. Your competition.
+        </p>
+
+    </div>
+
+
+    <div class="friends-panel">
+
+        <div id="friendsList"></div>
+
+        <button class="primary-button"
+                onclick="openProfile()">
+            + Add Friend
+        </button>
+
+    </div>
+
+</section>
+
+
+<!-- =========================
+     LEADERBOARD
+========================= -->
+
+<section id="leaderboardPage" class="page">
+
+    <div class="page-heading">
+
+        <small>WHO'S THE GOAT?</small>
+
+        <h1>🏆 Leaderboard</h1>
+
+        <p>
+            Play more. Score more. Flex more.
+        </p>
+
+    </div>
+
+
+    <div class="leaderboard">
+
+        <div class="leader first">
+            <span>🥇</span>
+            <strong id="rank1Name">You</strong>
+            <b id="rank1Score">0</b>
+        </div>
+
+        <div class="leader second">
+            <span>🥈</span>
+            <strong>Friend</strong>
+            <b>850</b>
+        </div>
+
+        <div class="leader third">
+            <span>🥉</span>
+            <strong>Friend 2</strong>
+            <b>720</b>
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =========================
+     GAME SCREEN
+========================= -->
+
+<section id="gamePage" class="page">
+
+    <button class="back-button"
+            onclick="showGames()">
+        ← Back to Games
+    </button>
+
+    <div id="gameContainer">
+
+        <!-- JavaScript loads games here -->
+
+    </div>
+
+</section>
+
+</main>
+
+
+<!-- =========================
+     PROFILE MODAL
+========================= -->
+
+<div id="profileModal" class="modal">
+
+    <div class="modal-content">
+
+        <button class="close-button"
+                onclick="closeProfile()">
+            ✕
+        </button>
+
+        <div class="profile-avatar">
+            😎
+        </div>
+
+        <h2>Create Your Profile</h2>
+
+        <p>
+            Choose a name for your FriendZone profile.
+        </p>
+
+        <input
+            type="text"
+            id="playerName"
+            placeholder="Enter your name"
+            maxlength="20"
+        >
+
+        <button class="primary-button"
+                onclick="saveProfile()">
+            🚀 Let's Go
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =========================
+     TOAST
+========================= -->
+
+<div id="toast" class="toast">
+    🎉 Nice!
+</div>
+
+
+<!-- =========================
+     JAVASCRIPT
+========================= -->
+
+<script src="script.js"></script>
+
+</body>
+</html>
