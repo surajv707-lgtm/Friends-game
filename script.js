@@ -2,46 +2,46 @@
    FRIENDZONE
    MAIN JAVASCRIPT
    SUPABASE + AUTH + FRIEND SYSTEM
-   VERSION: PREMIUM / STABLE
+   LOADING PAGE REMOVED
 ========================================================= */
 
-"use strict";
 
 /* =========================================================
    SUPABASE CONFIG
 ========================================================= */
 
-const CONFIG = window.FRIENDZONE_CONFIG || {};
-
 const SUPABASE_URL =
-  CONFIG.SUPABASE_URL ||
   "https://hjdevuoxuoyenzmawwnb.supabase.co";
 
 const SUPABASE_ANON_KEY =
-  CONFIG.SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IkFub24iLCJpYXQiOjE3ODg3ODgzNjYsImV4cCI6MjEwNDM2NDM2Nn0.-ER4x0hqUYss521B_FWAHnfWjtxg9YJIaWNXjQJPPhI";
 
-let supabaseClient = null;
+const supabaseClient =
+  window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
+
+window.FRIENDZONE_CONFIG = {
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+};
+
 
 /* =========================================================
    GLOBAL STATE
 ========================================================= */
 
-const state = {
-  user: null,
-  profile: null,
+let currentUser = null;
+let currentProfile = null;
 
-  friends: [],
-  receivedRequests: [],
-  sentRequests: [],
-  bestFriends: [],
+let allFriends = [];
+let allIncomingRequests = [];
+let allOutgoingRequests = [];
+let allBestFriends = [];
 
-  currentPage: "homePage",
-  requestTab: "received",
+let currentRequestTab = "received";
 
-  realtimeChannels: [],
-  initialized: false
-};
 
 /* =========================================================
    DOM HELPERS
@@ -53,15 +53,17 @@ const $ = (selector) =>
 const $$ = (selector) =>
   Array.from(document.querySelectorAll(selector));
 
-const byId = (id) =>
-  document.getElementById(id);
+function byId(id) {
+  return document.getElementById(id);
+}
 
-/* =========================================================
-   BASIC HELPERS
-========================================================= */
 
 function escapeHTML(value) {
-  return String(value ?? "")
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -69,16 +71,19 @@ function escapeHTML(value) {
     .replaceAll("'", "&#039;");
 }
 
-function initials(name = "Friend") {
-  const clean = String(name).trim();
 
-  if (!clean) return "FR";
+function initials(name = "User") {
+  const cleanName = String(name).trim();
 
-  const parts = clean.split(/\s+/);
+  if (!cleanName) {
+    return "U";
+  }
+
+  const parts = cleanName.split(/\s+/);
 
   if (parts.length === 1) {
     return parts[0]
-      .slice(0, 2)
+      .substring(0, 2)
       .toUpperCase();
   }
 
@@ -88,26 +93,6 @@ function initials(name = "Friend") {
   ).toUpperCase();
 }
 
-function getDisplayName() {
-  return (
-    state.profile?.name ||
-    state.user?.user_metadata?.name ||
-    state.user?.email?.split("@")[0] ||
-    "FriendZone User"
-  );
-}
-
-function getUsername() {
-  return (
-    state.profile?.username ||
-    state.user?.user_metadata?.username ||
-    ""
-  );
-}
-
-function getFriendID() {
-  return state.profile?.friend_id || "------";
-}
 
 /* =========================================================
    TOAST
@@ -119,7 +104,8 @@ function showToast(
   title = null
 ) {
   const container =
-    byId("toastContainer");
+    byId("toastContainer") ||
+    $(".toast-container");
 
   if (!container) {
     console.log(message);
@@ -173,26 +159,9 @@ function showToast(
   }, 4300);
 }
 
-/* =========================================================
-   LOADING SCREEN
-========================================================= */
-
-function hideLoader() {
-  const loader =
-    byId("appLoader");
-
-  if (!loader) return;
-
-  loader.classList.add("fade-out");
-
-  setTimeout(() => {
-    loader.classList.add("hidden");
-    loader.style.display = "none";
-  }, 450);
-}
 
 /* =========================================================
-   SCREEN CONTROL
+   AUTH SCREEN
 ========================================================= */
 
 function showAuthScreen() {
@@ -202,12 +171,17 @@ function showAuthScreen() {
   const app =
     byId("mainApp");
 
-  auth?.classList.remove("hidden");
-  app?.classList.add("hidden");
+  if (auth) {
+    auth.classList.remove("hidden");
+    auth.style.display = "";
+  }
 
-  if (auth) auth.style.display = "";
-  if (app) app.style.display = "none";
+  if (app) {
+    app.classList.add("hidden");
+    app.style.display = "none";
+  }
 }
+
 
 function showMainApp() {
   const auth =
@@ -216,12 +190,17 @@ function showMainApp() {
   const app =
     byId("mainApp");
 
-  auth?.classList.add("hidden");
-  app?.classList.remove("hidden");
+  if (auth) {
+    auth.classList.add("hidden");
+    auth.style.display = "none";
+  }
 
-  if (auth) auth.style.display = "none";
-  if (app) app.style.display = "";
+  if (app) {
+    app.classList.remove("hidden");
+    app.style.display = "";
+  }
 }
+
 
 /* =========================================================
    AUTH MODE
@@ -237,205 +216,351 @@ function switchAuthMode(mode) {
   if (mode === "signup") {
     loginPanel?.classList.add("hidden");
     signupPanel?.classList.remove("hidden");
-  } else {
-    signupPanel?.classList.add("hidden");
-    loginPanel?.classList.remove("hidden");
+    return;
   }
+
+  signupPanel?.classList.add("hidden");
+  loginPanel?.classList.remove("hidden");
 }
+
 
 /* =========================================================
-   BUTTON LOADING
+   SIGN UP
 ========================================================= */
 
-function setButtonLoading(button, loading) {
-  if (!button) return;
+async function signUp() {
+  const email =
+    byId("signupEmail")?.value.trim();
 
-  if (loading) {
-    button.disabled = true;
-    button.classList.add("btn-loading");
-  } else {
-    button.disabled = false;
-    button.classList.remove("btn-loading");
+  const password =
+    byId("signupPassword")?.value;
+
+  const name =
+    byId("signupName")?.value.trim();
+
+  const username =
+    byId("signupUsername")?.value.trim();
+
+  if (!email || !password || !name) {
+    showToast(
+      "Please fill all required fields.",
+      "warning"
+    );
+    return;
+  }
+
+  if (password.length < 6) {
+    showToast(
+      "Password must contain at least 6 characters.",
+      "warning"
+    );
+    return;
+  }
+
+  const button =
+    byId("signupBtn");
+
+  setButtonLoading(button, true);
+
+  try {
+    const {
+      data,
+      error
+    } =
+      await supabaseClient.auth.signUp({
+        email,
+        password,
+
+        options: {
+          data: {
+            name,
+            username
+          }
+        }
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    if (data?.session) {
+      showToast(
+        "Your FriendZone account has been created.",
+        "success"
+      );
+
+      await loadApplication(data.user);
+
+    } else {
+      showToast(
+        "Account created. Please verify your email if verification is enabled.",
+        "success"
+      );
+
+      switchAuthMode("login");
+    }
+
+  } catch (error) {
+    console.error(
+      "Signup error:",
+      error
+    );
+
+    showToast(
+      error.message ||
+      "Unable to create account.",
+      "error"
+    );
+
+  } finally {
+    setButtonLoading(button, false);
   }
 }
+
+
+/* =========================================================
+   LOGIN
+========================================================= */
+
+async function login() {
+  const email =
+    byId("loginEmail")?.value.trim();
+
+  const password =
+    byId("loginPassword")?.value;
+
+  if (!email || !password) {
+    showToast(
+      "Enter your email and password.",
+      "warning"
+    );
+    return;
+  }
+
+  const button =
+    byId("loginBtn");
+
+  setButtonLoading(button, true);
+
+  try {
+    const {
+      data,
+      error
+    } =
+      await supabaseClient.auth
+        .signInWithPassword({
+          email,
+          password
+        });
+
+    if (error) {
+      throw error;
+    }
+
+    showToast(
+      "Welcome back to FriendZone!",
+      "success"
+    );
+
+    await loadApplication(data.user);
+
+  } catch (error) {
+    console.error(
+      "Login error:",
+      error
+    );
+
+    showToast(
+      error.message ||
+      "Login failed.",
+      "error"
+    );
+
+  } finally {
+    setButtonLoading(button, false);
+  }
+}
+
+
+/* =========================================================
+   LOGOUT
+========================================================= */
+
+async function logout() {
+  try {
+    const {
+      error
+    } =
+      await supabaseClient.auth.signOut();
+
+    if (error) {
+      throw error;
+    }
+
+    currentUser = null;
+    currentProfile = null;
+
+    allFriends = [];
+    allIncomingRequests = [];
+    allOutgoingRequests = [];
+    allBestFriends = [];
+
+    showAuthScreen();
+
+    switchAuthMode("login");
+
+    showToast(
+      "You have been logged out.",
+      "success"
+    );
+
+  } catch (error) {
+    console.error(error);
+
+    showToast(
+      error.message ||
+      "Unable to log out.",
+      "error"
+    );
+  }
+}
+
+
+/* =========================================================
+   LOAD APPLICATION
+========================================================= */
+
+async function loadApplication(user) {
+  if (!user) {
+    return;
+  }
+
+  currentUser = user;
+
+  showMainApp();
+
+  try {
+    await loadProfile();
+
+    await Promise.allSettled([
+      loadFriends(),
+      loadFriendRequests(),
+      loadBestFriends()
+    ]);
+
+    updateUI();
+
+  } catch (error) {
+    console.error(
+      "Application loading error:",
+      error
+    );
+  }
+}
+
 
 /* =========================================================
    PROFILE
 ========================================================= */
 
 async function loadProfile() {
-  if (!state.user) return;
+  if (!currentUser) {
+    return;
+  }
 
   try {
-    const { data, error } =
+    const {
+      data,
+      error
+    } =
       await supabaseClient
         .from("profiles")
         .select("*")
-        .eq("id", state.user.id)
+        .eq("id", currentUser.id)
         .maybeSingle();
 
     if (error) {
-      console.error(
-        "Profile error:",
-        error
-      );
-      return;
+      throw error;
     }
 
-    if (data) {
-      state.profile = data;
-      return;
-    }
+    currentProfile = data;
 
-    await createMissingProfile();
+    if (!data) {
+      await createMissingProfile();
+    }
 
   } catch (error) {
     console.error(
-      "loadProfile:",
+      "Profile loading error:",
       error
     );
+
+    const metadata =
+      currentUser.user_metadata || {};
+
+    currentProfile = {
+      id: currentUser.id,
+      name:
+        metadata.name ||
+        currentUser.email?.split("@")[0] ||
+        "FriendZone User",
+      friend_id: null,
+      avatar_url: null
+    };
   }
 }
 
+
 async function createMissingProfile() {
-  if (!state.user) return;
+  if (!currentUser) {
+    return;
+  }
 
   const metadata =
-    state.user.user_metadata || {};
+    currentUser.user_metadata || {};
 
   const name =
     metadata.name ||
-    state.user.email?.split("@")[0] ||
+    currentUser.email?.split("@")[0] ||
     "FriendZone User";
 
   try {
-    const { data, error } =
+    const {
+      data,
+      error
+    } =
       await supabaseClient
         .from("profiles")
         .insert({
-          id: state.user.id,
+          id: currentUser.id,
           name
         })
         .select("*")
         .single();
 
-    if (!error && data) {
-      state.profile = data;
+    if (error) {
+      throw error;
     }
+
+    currentProfile = data;
 
   } catch (error) {
     console.error(
-      "createMissingProfile:",
+      "Create profile error:",
       error
     );
   }
 }
 
-/* =========================================================
-   PROFILE UI
-========================================================= */
-
-function renderProfile() {
-  const name =
-    getDisplayName();
-
-  const username =
-    getUsername();
-
-  const friendID =
-    getFriendID();
-
-  const avatar =
-    initials(name);
-
-  const avatarURL =
-    state.profile?.avatar_url;
-
-  const profileAvatar =
-    byId("profileAvatar");
-
-  const sidebarAvatar =
-    byId("sidebarAvatar");
-
-  const profileName =
-    byId("profileName");
-
-  const profileUsername =
-    byId("profileUsername");
-
-  const profileFriendId =
-    byId("profileFriendId");
-
-  const profileNameInput =
-    byId("profileNameInput");
-
-  const profileUsernameInput =
-    byId("profileUsernameInput");
-
-  if (profileAvatar) {
-    if (avatarURL) {
-      profileAvatar.innerHTML =
-        `<img src="${escapeHTML(avatarURL)}" alt="Profile">`;
-    } else {
-      profileAvatar.textContent = avatar;
-    }
-  }
-
-  if (sidebarAvatar) {
-    if (avatarURL) {
-      sidebarAvatar.innerHTML =
-        `<img src="${escapeHTML(avatarURL)}" alt="Profile">`;
-    } else {
-      sidebarAvatar.textContent = avatar;
-    }
-  }
-
-  if (profileName) {
-    profileName.textContent = name;
-  }
-
-  if (profileUsername) {
-    profileUsername.textContent =
-      username
-        ? `@${username}`
-        : "FriendZone member";
-  }
-
-  if (profileFriendId) {
-    profileFriendId.textContent =
-      friendID;
-  }
-
-  if (profileNameInput) {
-    profileNameInput.value = name;
-  }
-
-  if (profileUsernameInput) {
-    profileUsernameInput.value =
-      username;
-  }
-
-  const sidebarName =
-    byId("sidebarUserName");
-
-  const sidebarID =
-    byId("sidebarFriendId");
-
-  if (sidebarName) {
-    sidebarName.textContent = name;
-  }
-
-  if (sidebarID) {
-    sidebarID.textContent = friendID;
-  }
-}
 
 /* =========================================================
    UPDATE PROFILE
 ========================================================= */
 
 async function updateProfile() {
-  if (!state.user) return;
+  if (!currentUser) {
+    return;
+  }
 
   const name =
     byId("profileNameInput")
@@ -447,22 +572,22 @@ async function updateProfile() {
 
   if (!name) {
     showToast(
-      "Your name cannot be empty.",
+      "Name cannot be empty.",
       "warning"
     );
     return;
   }
 
   const button =
-    byId("profileForm")
-      ?.querySelector(
-        "button[type='submit']"
-      );
+    byId("saveProfileBtn");
 
   setButtonLoading(button, true);
 
   try {
-    const { error } =
+
+    const {
+      error: profileError
+    } =
       await supabaseClient
         .from("profiles")
         .update({
@@ -470,34 +595,22 @@ async function updateProfile() {
           updated_at:
             new Date().toISOString()
         })
-        .eq("id", state.user.id);
+        .eq("id", currentUser.id);
 
-    if (error) {
-      throw error;
+    if (profileError) {
+      throw profileError;
     }
 
-    const { data: authData, error: authError } =
-      await supabaseClient.auth.updateUser({
-        data: {
-          name,
-          username
-        }
-      });
-
-    if (authError) {
-      console.warn(
-        "Metadata update:",
-        authError
-      );
-    }
-
-    state.user =
-      authData?.user ||
-      state.user;
+    await supabaseClient.auth.updateUser({
+      data: {
+        name,
+        username
+      }
+    });
 
     await loadProfile();
 
-    renderProfile();
+    updateUI();
 
     showToast(
       "Profile updated successfully.",
@@ -509,7 +622,7 @@ async function updateProfile() {
 
     showToast(
       error.message ||
-      "Unable to update your profile.",
+      "Could not update profile.",
       "error"
     );
 
@@ -518,15 +631,27 @@ async function updateProfile() {
   }
 }
 
+
 /* =========================================================
-   FRIEND ID COPY
+   FRIEND ID
 ========================================================= */
+
+function getFriendID() {
+  return (
+    currentProfile?.friend_id ||
+    "------"
+  );
+}
+
 
 async function copyFriendID() {
   const id =
     getFriendID();
 
-  if (!id || id === "------") {
+  if (
+    !id ||
+    id === "------"
+  ) {
     showToast(
       "Your Friend ID is not available yet.",
       "warning"
@@ -538,7 +663,7 @@ async function copyFriendID() {
     await navigator.clipboard.writeText(id);
 
     showToast(
-      "Friend ID copied.",
+      "Friend ID copied to clipboard.",
       "success"
     );
 
@@ -550,211 +675,60 @@ async function copyFriendID() {
   }
 }
 
+
 /* =========================================================
-   FIND PROFILE BY FRIEND ID
+   FIND USER BY FRIEND ID
 ========================================================= */
 
 async function findUserByFriendID(friendID) {
-  const normalized =
+  const id =
     String(friendID || "")
       .trim()
       .toUpperCase();
 
-  if (!normalized) {
+  if (!id) {
     return null;
   }
 
   try {
-    const { data, error } =
+    const {
+      data,
+      error
+    } =
       await supabaseClient
         .from("profiles")
         .select("*")
-        .eq("friend_id", normalized)
+        .eq("friend_id", id)
         .maybeSingle();
-
-    if (error) {
-      console.error(error);
-      return null;
-    }
-
-    return data;
-
-  } catch (error) {
-    console.error(error);
-    return null;
-  }
-}
-
-/* =========================================================
-   RELATIONSHIP CHECK
-========================================================= */
-
-async function getRelationship(otherID) {
-  if (!state.user || !otherID) {
-    return null;
-  }
-
-  if (otherID === state.user.id) {
-    return {
-      type: "self"
-    };
-  }
-
-  try {
-    const { data: friendship } =
-      await supabaseClient
-        .from("friendships")
-        .select("id")
-        .eq("user_id", state.user.id)
-        .eq("friend_id", otherID)
-        .maybeSingle();
-
-    if (friendship) {
-      return {
-        type: "friend",
-        record: friendship
-      };
-    }
-
-    const { data: outgoing } =
-      await supabaseClient
-        .from("friend_requests")
-        .select("id,status")
-        .eq("sender_id", state.user.id)
-        .eq("receiver_id", otherID)
-        .eq("status", "pending")
-        .maybeSingle();
-
-    if (outgoing) {
-      return {
-        type: "sent",
-        record: outgoing
-      };
-    }
-
-    const { data: incoming } =
-      await supabaseClient
-        .from("friend_requests")
-        .select("id,status")
-        .eq("sender_id", otherID)
-        .eq("receiver_id", state.user.id)
-        .eq("status", "pending")
-        .maybeSingle();
-
-    if (incoming) {
-      return {
-        type: "received",
-        record: incoming
-      };
-    }
-
-  } catch (error) {
-    console.error(
-      "Relationship:",
-      error
-    );
-  }
-
-  return null;
-}
-
-/* =========================================================
-   SEND FRIEND REQUEST
-========================================================= */
-
-async function sendFriendRequest(receiverID) {
-  if (!state.user) {
-    showToast(
-      "Please log in first.",
-      "warning"
-    );
-    return;
-  }
-
-  if (
-    !receiverID ||
-    receiverID === state.user.id
-  ) {
-    showToast(
-      "You cannot add yourself.",
-      "warning"
-    );
-    return;
-  }
-
-  try {
-    const relationship =
-      await getRelationship(receiverID);
-
-    if (relationship?.type === "friend") {
-      showToast(
-        "You are already friends.",
-        "info"
-      );
-      return;
-    }
-
-    if (relationship?.type === "sent") {
-      showToast(
-        "Friend request already sent.",
-        "info"
-      );
-      return;
-    }
-
-    if (relationship?.type === "received") {
-      showToast(
-        "This person has already sent you a request. Check Requests.",
-        "info"
-      );
-      return;
-    }
-
-    const { error } =
-      await supabaseClient
-        .from("friend_requests")
-        .insert({
-          sender_id: state.user.id,
-          receiver_id: receiverID,
-          status: "pending"
-        });
 
     if (error) {
       throw error;
     }
 
-    showToast(
-      "Friend request sent!",
-      "success"
-    );
-
-    await loadFriendRequests();
-
-    renderAll();
+    return data;
 
   } catch (error) {
-    console.error(error);
-
-    showToast(
-      error.message ||
-      "Unable to send friend request.",
-      "error"
+    console.error(
+      "Friend ID search error:",
+      error
     );
+
+    return null;
   }
 }
 
+
 /* =========================================================
-   SEARCH FRIEND
+   SEARCH FRIEND ID
 ========================================================= */
 
-async function searchFriend() {
+async function searchFriendID() {
   const input =
     byId("friendIdInput");
 
-  const result =
-    byId("friendSearchResult");
-
-  if (!input || !result) return;
+  if (!input) {
+    return;
+  }
 
   const friendID =
     input.value
@@ -769,7 +743,9 @@ async function searchFriend() {
     return;
   }
 
-  if (friendID === getFriendID()) {
+  if (
+    friendID === getFriendID()
+  ) {
     showToast(
       "You cannot add yourself.",
       "warning"
@@ -777,14 +753,23 @@ async function searchFriend() {
     return;
   }
 
+  const result =
+    byId("friendSearchResult");
+
   const user =
     await findUserByFriendID(friendID);
+
+  if (!result) {
+    return;
+  }
 
   if (!user) {
     result.innerHTML = `
       <div class="empty-state compact">
         <div class="empty-icon">?</div>
+
         <h4>User not found</h4>
+
         <p>
           No FriendZone account was found
           with this Friend ID.
@@ -793,30 +778,59 @@ async function searchFriend() {
     `;
 
     result.classList.remove("hidden");
+
     return;
   }
 
   const relationship =
-    await getRelationship(user.id);
+    await getFriendshipStatus(user.id);
 
-  let buttonText =
-    "Add Friend";
-
-  let disabled = false;
+  let buttonHTML = "";
 
   if (relationship?.type === "friend") {
-    buttonText = "Already Friends";
-    disabled = true;
-  }
-
-  if (relationship?.type === "sent") {
-    buttonText = "Request Sent";
-    disabled = true;
-  }
-
-  if (relationship?.type === "received") {
-    buttonText = "Request Received";
-    disabled = true;
+    buttonHTML = `
+      <button
+        class="secondary-btn"
+        type="button"
+        disabled
+      >
+        Already Friends
+      </button>
+    `;
+  } else if (
+    relationship?.type === "outgoing"
+  ) {
+    buttonHTML = `
+      <button
+        class="secondary-btn"
+        type="button"
+        disabled
+      >
+        Request Sent
+      </button>
+    `;
+  } else if (
+    relationship?.type === "incoming"
+  ) {
+    buttonHTML = `
+      <button
+        class="secondary-btn"
+        type="button"
+        disabled
+      >
+        Request Received
+      </button>
+    `;
+  } else {
+    buttonHTML = `
+      <button
+        class="primary-btn"
+        id="sendSearchRequestBtn"
+        type="button"
+      >
+        Add Friend
+      </button>
+    `;
   }
 
   result.innerHTML = `
@@ -845,14 +859,7 @@ async function searchFriend() {
 
       </div>
 
-      <button
-        class="primary-btn"
-        type="button"
-        id="sendSearchRequestBtn"
-        ${disabled ? "disabled" : ""}
-      >
-        ${buttonText}
-      </button>
+      ${buttonHTML}
 
     </div>
   `;
@@ -866,257 +873,328 @@ async function searchFriend() {
     );
 }
 
+
 /* =========================================================
-   LOAD FRIENDS
+   CHECK RELATIONSHIP
 ========================================================= */
 
-async function loadFriends() {
-  if (!state.user) return;
+async function getFriendshipStatus(otherUserID) {
+  if (
+    !currentUser ||
+    !otherUserID
+  ) {
+    return null;
+  }
 
   try {
-    const { data, error } =
+
+    const {
+      data: friendship
+    } =
       await supabaseClient
         .from("friendships")
-        .select(
-          "id,user_id,friend_id,created_at"
-        )
-        .eq(
-          "user_id",
-          state.user.id
-        )
-        .order(
-          "created_at",
-          { ascending: false }
-        );
+        .select("id")
+        .eq("user_id", currentUser.id)
+        .eq("friend_id", otherUserID)
+        .maybeSingle();
 
-    if (error) {
-      throw error;
+    if (friendship) {
+      return {
+        type: "friend",
+        record: friendship
+      };
     }
 
-    const friendships =
-      data || [];
+    const {
+      data: outgoing
+    } =
+      await supabaseClient
+        .from("friend_requests")
+        .select("id,status")
+        .eq("sender_id", currentUser.id)
+        .eq("receiver_id", otherUserID)
+        .eq("status", "pending")
+        .maybeSingle();
 
-    const ids =
-      friendships.map(
-        item => item.friend_id
-      );
+    if (outgoing) {
+      return {
+        type: "outgoing",
+        record: outgoing
+      };
+    }
 
-    const profiles =
-      await getProfiles(ids);
+    const {
+      data: incoming
+    } =
+      await supabaseClient
+        .from("friend_requests")
+        .select("id,status")
+        .eq("sender_id", otherUserID)
+        .eq("receiver_id", currentUser.id)
+        .eq("status", "pending")
+        .maybeSingle();
 
-    const profileMap =
-      new Map(
-        profiles.map(
-          profile => [
-            profile.id,
-            profile
-          ]
-        )
-      );
+    if (incoming) {
+      return {
+        type: "incoming",
+        record: incoming
+      };
+    }
 
-    state.friends =
-      friendships
-        .map(item => ({
-          ...item,
-          friend:
-            profileMap.get(
-              item.friend_id
-            ) || null
-        }))
-        .filter(
-          item => item.friend
-        );
+    return null;
 
   } catch (error) {
-    console.error(
-      "Friends loading:",
-      error
-    );
-
-    state.friends = [];
+    console.error(error);
+    return null;
   }
 }
 
+
 /* =========================================================
-   LOAD PROFILES BY IDS
+   SEND FRIEND REQUEST
 ========================================================= */
 
-async function getProfiles(ids) {
-  const uniqueIDs =
-    [...new Set(
-      (ids || [])
-        .filter(Boolean)
-    )];
+async function sendFriendRequest(receiverID) {
+  if (!currentUser) {
+    return;
+  }
 
-  if (!uniqueIDs.length) {
-    return [];
+  if (
+    receiverID === currentUser.id
+  ) {
+    showToast(
+      "You cannot send a request to yourself.",
+      "warning"
+    );
+    return;
   }
 
   try {
-    const { data, error } =
+
+    const relationship =
+      await getFriendshipStatus(
+        receiverID
+      );
+
+    if (
+      relationship?.type === "friend"
+    ) {
+      showToast(
+        "You are already friends.",
+        "info"
+      );
+      return;
+    }
+
+    if (
+      relationship?.type === "outgoing"
+    ) {
+      showToast(
+        "Friend request already sent.",
+        "info"
+      );
+      return;
+    }
+
+    if (
+      relationship?.type === "incoming"
+    ) {
+      showToast(
+        "This person has already sent you a request.",
+        "info"
+      );
+      return;
+    }
+
+    const {
+      error
+    } =
       await supabaseClient
-        .from("profiles")
-        .select("*")
-        .in("id", uniqueIDs);
+        .from("friend_requests")
+        .insert({
+          sender_id: currentUser.id,
+          receiver_id: receiverID,
+          status: "pending"
+        });
 
     if (error) {
       throw error;
     }
 
-    return data || [];
+    showToast(
+      "Friend request sent successfully.",
+      "success"
+    );
+
+    await loadFriendRequests();
 
   } catch (error) {
     console.error(
-      "Profiles:",
+      "Send request error:",
       error
     );
 
-    return [];
+    showToast(
+      error.message ||
+      "Unable to send friend request.",
+      "error"
+    );
   }
 }
 
+
 /* =========================================================
-   LOAD REQUESTS
+   LOAD FRIEND REQUESTS
 ========================================================= */
 
 async function loadFriendRequests() {
-  if (!state.user) return;
+  if (!currentUser) {
+    return;
+  }
 
   try {
-    const [
-      incomingResult,
-      outgoingResult
-    ] = await Promise.all([
-      supabaseClient
+
+    const {
+      data: incoming,
+      error: incomingError
+    } =
+      await supabaseClient
         .from("friend_requests")
         .select("*")
         .eq(
           "receiver_id",
-          state.user.id
+          currentUser.id
         )
-        .eq(
-          "status",
-          "pending"
-        )
-        .order(
-          "created_at",
-          { ascending: false }
-        ),
+        .eq("status", "pending")
+        .order("created_at", {
+          ascending: false
+        });
 
-      supabaseClient
+    if (incomingError) {
+      throw incomingError;
+    }
+
+
+    const {
+      data: outgoing,
+      error: outgoingError
+    } =
+      await supabaseClient
         .from("friend_requests")
         .select("*")
         .eq(
           "sender_id",
-          state.user.id
+          currentUser.id
         )
-        .eq(
-          "status",
-          "pending"
-        )
-        .order(
-          "created_at",
-          { ascending: false }
-        )
-    ]);
+        .eq("status", "pending")
+        .order("created_at", {
+          ascending: false
+        });
 
-    if (incomingResult.error) {
-      throw incomingResult.error;
+    if (outgoingError) {
+      throw outgoingError;
     }
 
-    if (outgoingResult.error) {
-      throw outgoingResult.error;
+
+    allIncomingRequests = [];
+
+    for (
+      const request of incoming || []
+    ) {
+
+      const {
+        data: profile
+      } =
+        await supabaseClient
+          .from("profiles")
+          .select("*")
+          .eq(
+            "id",
+            request.sender_id
+          )
+          .maybeSingle();
+
+      allIncomingRequests.push({
+        ...request,
+        sender: profile
+      });
     }
 
-    const incoming =
-      incomingResult.data || [];
 
-    const outgoing =
-      outgoingResult.data || [];
+    allOutgoingRequests = [];
 
-    const incomingIDs =
-      incoming.map(
-        item => item.sender_id
-      );
+    for (
+      const request of outgoing || []
+    ) {
 
-    const outgoingIDs =
-      outgoing.map(
-        item => item.receiver_id
-      );
+      const {
+        data: profile
+      } =
+        await supabaseClient
+          .from("profiles")
+          .select("*")
+          .eq(
+            "id",
+            request.receiver_id
+          )
+          .maybeSingle();
 
-    const profiles =
-      await getProfiles([
-        ...incomingIDs,
-        ...outgoingIDs
-      ]);
+      allOutgoingRequests.push({
+        ...request,
+        receiver: profile
+      });
+    }
 
-    const profileMap =
-      new Map(
-        profiles.map(
-          profile => [
-            profile.id,
-            profile
-          ]
-        )
-      );
 
-    state.receivedRequests =
-      incoming.map(item => ({
-        ...item,
-        user:
-          profileMap.get(
-            item.sender_id
-          ) || null
-      }));
+    renderIncomingRequests();
+    renderOutgoingRequests();
 
-    state.sentRequests =
-      outgoing.map(item => ({
-        ...item,
-        user:
-          profileMap.get(
-            item.receiver_id
-          ) || null
-      }));
+    updateRequestCounts();
 
   } catch (error) {
+
     console.error(
-      "Requests loading:",
+      "Request loading error:",
       error
     );
-
-    state.receivedRequests = [];
-    state.sentRequests = [];
   }
 }
 
+
 /* =========================================================
-   ACCEPT REQUEST
+   ACCEPT FRIEND REQUEST
 ========================================================= */
 
 async function acceptFriendRequest(requestID) {
-  if (!state.user) return;
+  if (!currentUser) {
+    return;
+  }
 
   try {
-    const { data: request, error } =
+
+    const {
+      data: request,
+      error: requestError
+    } =
       await supabaseClient
         .from("friend_requests")
         .select("*")
         .eq("id", requestID)
         .eq(
           "receiver_id",
-          state.user.id
+          currentUser.id
         )
-        .eq(
-          "status",
-          "pending"
-        )
+        .eq("status", "pending")
         .single();
 
-    if (error) {
-      throw error;
+    if (requestError) {
+      throw requestError;
     }
 
-    const { error: updateError } =
+
+    const {
+      error: updateError
+    } =
       await supabaseClient
         .from("friend_requests")
         .update({
@@ -1130,44 +1208,50 @@ async function acceptFriendRequest(requestID) {
       throw updateError;
     }
 
-    const { error: friendshipError } =
+
+    const {
+      error: friendshipError
+    } =
       await supabaseClient
         .from("friendships")
         .insert([
           {
-            user_id: state.user.id,
-            friend_id:
-              request.sender_id
+            user_id: currentUser.id,
+            friend_id: request.sender_id
           },
           {
-            user_id:
-              request.sender_id,
-            friend_id:
-              state.user.id
+            user_id: request.sender_id,
+            friend_id: currentUser.id
           }
         ]);
 
     if (
       friendshipError &&
-      !String(
-        friendshipError.message
-      )
+      !String(friendshipError.message)
         .toLowerCase()
         .includes("duplicate")
     ) {
       throw friendshipError;
     }
 
+
     showToast(
       "Friend request accepted!",
       "success"
     );
 
-    await refreshEverything();
+
+    await Promise.all([
+      loadFriends(),
+      loadFriendRequests()
+    ]);
+
+    updateUI();
 
   } catch (error) {
+
     console.error(
-      "Accept request:",
+      "Accept request error:",
       error
     );
 
@@ -1179,15 +1263,21 @@ async function acceptFriendRequest(requestID) {
   }
 }
 
+
 /* =========================================================
-   REJECT REQUEST
+   REJECT FRIEND REQUEST
 ========================================================= */
 
 async function rejectFriendRequest(requestID) {
-  if (!state.user) return;
+  if (!currentUser) {
+    return;
+  }
 
   try {
-    const { error } =
+
+    const {
+      error
+    } =
       await supabaseClient
         .from("friend_requests")
         .update({
@@ -1198,12 +1288,9 @@ async function rejectFriendRequest(requestID) {
         .eq("id", requestID)
         .eq(
           "receiver_id",
-          state.user.id
+          currentUser.id
         )
-        .eq(
-          "status",
-          "pending"
-        );
+        .eq("status", "pending");
 
     if (error) {
       throw error;
@@ -1216,9 +1303,8 @@ async function rejectFriendRequest(requestID) {
 
     await loadFriendRequests();
 
-    renderAll();
-
   } catch (error) {
+
     console.error(error);
 
     showToast(
@@ -1229,27 +1315,30 @@ async function rejectFriendRequest(requestID) {
   }
 }
 
+
 /* =========================================================
-   CANCEL REQUEST
+   CANCEL FRIEND REQUEST
 ========================================================= */
 
 async function cancelFriendRequest(requestID) {
-  if (!state.user) return;
+  if (!currentUser) {
+    return;
+  }
 
   try {
-    const { error } =
+
+    const {
+      error
+    } =
       await supabaseClient
         .from("friend_requests")
         .delete()
         .eq("id", requestID)
         .eq(
           "sender_id",
-          state.user.id
+          currentUser.id
         )
-        .eq(
-          "status",
-          "pending"
-        );
+        .eq("status", "pending");
 
     if (error) {
       throw error;
@@ -1262,9 +1351,8 @@ async function cancelFriendRequest(requestID) {
 
     await loadFriendRequests();
 
-    renderAll();
-
   } catch (error) {
+
     console.error(error);
 
     showToast(
@@ -1275,118 +1363,279 @@ async function cancelFriendRequest(requestID) {
   }
 }
 
+
 /* =========================================================
-   LOAD BEST FRIENDS
+   LOAD FRIENDS
 ========================================================= */
 
-async function loadBestFriends() {
-  if (!state.user) return;
+async function loadFriends() {
+  if (!currentUser) {
+    return;
+  }
 
   try {
-    const { data, error } =
+
+    const {
+      data,
+      error
+    } =
       await supabaseClient
-        .from("best_friends")
-        .select(
-          "id,user_id,friend_id,created_at"
-        )
+        .from("friendships")
+        .select("*")
         .eq(
           "user_id",
-          state.user.id
+          currentUser.id
         )
-        .order(
-          "created_at",
-          { ascending: false }
-        );
+        .order("created_at", {
+          ascending: false
+        });
 
     if (error) {
       throw error;
     }
 
-    const items =
-      data || [];
+    allFriends = [];
 
-    const profiles =
-      await getProfiles(
-        items.map(
-          item => item.friend_id
-        )
-      );
+    for (
+      const friendship of data || []
+    ) {
 
-    const profileMap =
-      new Map(
-        profiles.map(
-          profile => [
-            profile.id,
-            profile
-          ]
-        )
-      );
+      const {
+        data: profile
+      } =
+        await supabaseClient
+          .from("profiles")
+          .select("*")
+          .eq(
+            "id",
+            friendship.friend_id
+          )
+          .maybeSingle();
 
-    state.bestFriends =
-      items
-        .map(item => ({
-          ...item,
-          friend:
-            profileMap.get(
-              item.friend_id
-            ) || null
-        }))
-        .filter(
-          item => item.friend
-        );
+      allFriends.push({
+        ...friendship,
+        friend: profile
+      });
+    }
+
+    renderFriends();
+    renderFriendsPreview();
 
   } catch (error) {
+
     console.error(
-      "Best friends:",
+      "Friends loading error:",
       error
     );
-
-    state.bestFriends = [];
   }
 }
+
+
+/* =========================================================
+   REMOVE FRIEND
+========================================================= */
+
+async function removeFriend(friendID) {
+  if (
+    !currentUser ||
+    !friendID
+  ) {
+    return;
+  }
+
+  const confirmed =
+    window.confirm(
+      "Are you sure you want to remove this friend?"
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+
+    const {
+      error: firstError
+    } =
+      await supabaseClient
+        .from("friendships")
+        .delete()
+        .eq(
+          "user_id",
+          currentUser.id
+        )
+        .eq(
+          "friend_id",
+          friendID
+        );
+
+    if (firstError) {
+      throw firstError;
+    }
+
+
+    await supabaseClient
+      .from("friendships")
+      .delete()
+      .eq(
+        "user_id",
+        friendID
+      )
+      .eq(
+        "friend_id",
+        currentUser.id
+      );
+
+
+    await supabaseClient
+      .from("best_friends")
+      .delete()
+      .eq(
+        "user_id",
+        currentUser.id
+      )
+      .eq(
+        "friend_id",
+        friendID
+      );
+
+
+    showToast(
+      "Friend removed.",
+      "success"
+    );
+
+
+    await Promise.all([
+      loadFriends(),
+      loadBestFriends()
+    ]);
+
+    updateUI();
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      error.message ||
+      "Unable to remove friend.",
+      "error"
+    );
+  }
+}
+
+
+/* =========================================================
+   LOAD BEST FRIENDS
+========================================================= */
+
+async function loadBestFriends() {
+  if (!currentUser) {
+    return;
+  }
+
+  try {
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient
+        .from("best_friends")
+        .select("*")
+        .eq(
+          "user_id",
+          currentUser.id
+        )
+        .order("created_at", {
+          ascending: false
+        });
+
+    if (error) {
+      throw error;
+    }
+
+    allBestFriends = [];
+
+    for (
+      const item of data || []
+    ) {
+
+      const {
+        data: profile
+      } =
+        await supabaseClient
+          .from("profiles")
+          .select("*")
+          .eq(
+            "id",
+            item.friend_id
+          )
+          .maybeSingle();
+
+      allBestFriends.push({
+        ...item,
+        friend: profile
+      });
+    }
+
+    renderBestFriends();
+
+  } catch (error) {
+
+    console.error(
+      "Best friends loading error:",
+      error
+    );
+  }
+}
+
 
 /* =========================================================
    ADD BEST FRIEND
 ========================================================= */
 
 async function addBestFriend(friendID) {
-  if (!state.user) return;
+  if (!currentUser) {
+    return;
+  }
 
-  const isFriend =
-    state.friends.some(
+  if (
+    !allFriends.some(
       item =>
         item.friend_id === friendID
-    );
-
-  if (!isFriend) {
+    )
+  ) {
     showToast(
-      "Only your existing Friends can be added as Best Friends.",
+      "You can only add an existing friend as a Best Friend.",
       "warning"
     );
     return;
   }
 
-  const alreadyBest =
-    state.bestFriends.some(
+  if (
+    allBestFriends.some(
       item =>
         item.friend_id === friendID
-    );
-
-  if (alreadyBest) {
+    )
+  ) {
     showToast(
-      "Already in Best Friends.",
+      "This person is already a Best Friend.",
       "info"
     );
     return;
   }
 
   try {
-    const { error } =
+
+    const {
+      error
+    } =
       await supabaseClient
         .from("best_friends")
         .insert({
-          user_id:
-            state.user.id,
+          user_id: currentUser.id,
           friend_id: friendID
         });
 
@@ -1401,9 +1650,10 @@ async function addBestFriend(friendID) {
 
     await loadBestFriends();
 
-    renderAll();
+    renderFriends();
 
   } catch (error) {
+
     console.error(error);
 
     showToast(
@@ -1414,21 +1664,27 @@ async function addBestFriend(friendID) {
   }
 }
 
+
 /* =========================================================
    REMOVE BEST FRIEND
 ========================================================= */
 
 async function removeBestFriend(friendID) {
-  if (!state.user) return;
+  if (!currentUser) {
+    return;
+  }
 
   try {
-    const { error } =
+
+    const {
+      error
+    } =
       await supabaseClient
         .from("best_friends")
         .delete()
         .eq(
           "user_id",
-          state.user.id
+          currentUser.id
         )
         .eq(
           "friend_id",
@@ -1446,9 +1702,10 @@ async function removeBestFriend(friendID) {
 
     await loadBestFriends();
 
-    renderAll();
+    renderFriends();
 
   } catch (error) {
+
     console.error(error);
 
     showToast(
@@ -1459,109 +1716,31 @@ async function removeBestFriend(friendID) {
   }
 }
 
-/* =========================================================
-   REMOVE FRIEND
-========================================================= */
-
-async function removeFriend(friendID) {
-  if (!state.user) return;
-
-  const friend =
-    state.friends.find(
-      item =>
-        item.friend_id === friendID
-    )?.friend;
-
-  const name =
-    friend?.name ||
-    "this friend";
-
-  if (
-    !window.confirm(
-      `Remove ${name} from your Friends?`
-    )
-  ) {
-    return;
-  }
-
-  try {
-    const first =
-      await supabaseClient
-        .from("friendships")
-        .delete()
-        .eq(
-          "user_id",
-          state.user.id
-        )
-        .eq(
-          "friend_id",
-          friendID
-        );
-
-    if (first.error) {
-      throw first.error;
-    }
-
-    await supabaseClient
-      .from("friendships")
-      .delete()
-      .eq(
-        "user_id",
-        friendID
-      )
-      .eq(
-        "friend_id",
-        state.user.id
-      );
-
-    await supabaseClient
-      .from("best_friends")
-      .delete()
-      .eq(
-        "user_id",
-        state.user.id
-      )
-      .eq(
-        "friend_id",
-        friendID
-      );
-
-    showToast(
-      "Friend removed.",
-      "success"
-    );
-
-    await refreshEverything();
-
-  } catch (error) {
-    console.error(error);
-
-    showToast(
-      error.message ||
-      "Unable to remove friend.",
-      "error"
-    );
-  }
-}
 
 /* =========================================================
    FRIEND CARD
 ========================================================= */
 
-function createFriendCard(item, isBestPage = false) {
+function createFriendCard(
+  item,
+  best = false
+) {
   const friend =
-    item?.friend;
+    item.friend;
 
-  if (!friend) return "";
+  if (!friend) {
+    return "";
+  }
 
   const isBest =
-    state.bestFriends.some(
-      best =>
-        best.friend_id === friend.id
+    allBestFriends.some(
+      bestFriend =>
+        bestFriend.friend_id ===
+        friend.id
     );
 
   return `
-    <article
+    <div
       class="friend-card"
       data-friend-name="${escapeHTML(
         friend.name
@@ -1572,7 +1751,7 @@ function createFriendCard(item, isBestPage = false) {
     >
 
       ${
-        isBest || isBestPage
+        isBest || best
           ? `
             <div
               class="best-mark"
@@ -1587,30 +1766,16 @@ function createFriendCard(item, isBestPage = false) {
       <div class="friend-card-top">
 
         <div class="friend-avatar">
-          ${
-            friend.avatar_url
-              ? `
-                <img
-                  src="${escapeHTML(
-                    friend.avatar_url
-                  )}"
-                  alt="${escapeHTML(
-                    friend.name
-                  )}"
-                >
-              `
-              : escapeHTML(
-                  initials(friend.name)
-                )
-          }
+          ${escapeHTML(
+            initials(friend.name)
+          )}
         </div>
 
         <div class="friend-card-info">
 
           <h4>
             ${escapeHTML(
-              friend.name ||
-              "Friend"
+              friend.name
             )}
           </h4>
 
@@ -1634,8 +1799,8 @@ function createFriendCard(item, isBestPage = false) {
       <div class="friend-card-actions">
 
         <button
-          type="button"
           class="small-action-btn"
+          type="button"
           data-action="remove-friend"
           data-user-id="${escapeHTML(
             friend.id
@@ -1645,12 +1810,12 @@ function createFriendCard(item, isBestPage = false) {
         </button>
 
         ${
-          isBest || isBestPage
+          !isBest && !best
             ? `
               <button
-                type="button"
                 class="small-action-btn primary"
-                data-action="remove-best"
+                type="button"
+                data-action="best-friend"
                 data-user-id="${escapeHTML(
                   friend.id
                 )}"
@@ -1660,9 +1825,9 @@ function createFriendCard(item, isBestPage = false) {
             `
             : `
               <button
-                type="button"
                 class="small-action-btn primary"
-                data-action="best-friend"
+                type="button"
+                data-action="remove-best"
                 data-user-id="${escapeHTML(
                   friend.id
                 )}"
@@ -1674,9 +1839,10 @@ function createFriendCard(item, isBestPage = false) {
 
       </div>
 
-    </article>
+    </div>
   `;
 }
+
 
 /* =========================================================
    RENDER FRIENDS
@@ -1686,9 +1852,11 @@ function renderFriends() {
   const container =
     byId("friendsContainer");
 
-  if (!container) return;
+  if (!container) {
+    return;
+  }
 
-  if (!state.friends.length) {
+  if (!allFriends.length) {
     container.innerHTML = `
       <div class="empty-state">
 
@@ -1701,14 +1869,14 @@ function renderFriends() {
         </h3>
 
         <p>
-          Start building your circle by
-          adding someone with their Friend ID.
+          Start by using a Friend ID
+          to send your first friend request.
         </p>
 
         <button
           class="primary-btn"
           type="button"
-          data-go-page="addFriendPage"
+          data-page="addFriendPage"
         >
           Add Your First Friend
         </button>
@@ -1720,24 +1888,27 @@ function renderFriends() {
   }
 
   container.innerHTML =
-    state.friends
+    allFriends
       .map(item =>
         createFriendCard(item)
       )
       .join("");
 }
 
+
 /* =========================================================
-   RENDER HOME RECENT FRIENDS
+   FRIEND PREVIEW
 ========================================================= */
 
-function renderRecentFriends() {
+function renderFriendsPreview() {
   const container =
     byId("recentFriendsContainer");
 
-  if (!container) return;
+  if (!container) {
+    return;
+  }
 
-  if (!state.friends.length) {
+  if (!allFriends.length) {
     container.innerHTML = `
       <div class="empty-state compact">
 
@@ -1746,11 +1917,11 @@ function renderRecentFriends() {
         </div>
 
         <h4>
-          Your circle is empty
+          No friends yet
         </h4>
 
         <p>
-          Add your first friend using a Friend ID.
+          Add people using their Friend ID.
         </p>
 
       </div>
@@ -1760,13 +1931,14 @@ function renderRecentFriends() {
   }
 
   container.innerHTML =
-    state.friends
+    allFriends
       .slice(0, 4)
       .map(item =>
         createFriendCard(item)
       )
       .join("");
 }
+
 
 /* =========================================================
    RENDER BEST FRIENDS
@@ -1776,9 +1948,11 @@ function renderBestFriends() {
   const container =
     byId("bestFriendsContainer");
 
-  if (!container) return;
+  if (!container) {
+    return;
+  }
 
-  if (!state.bestFriends.length) {
+  if (!allBestFriends.length) {
     container.innerHTML = `
       <div class="empty-state">
 
@@ -1791,8 +1965,9 @@ function renderBestFriends() {
         </h3>
 
         <p>
-          Best Friends are completely optional.
-          Add your closest Friends whenever you want.
+          Best Friends are optional.
+          Add your closest friends whenever
+          you want.
         </p>
 
       </div>
@@ -1802,7 +1977,7 @@ function renderBestFriends() {
   }
 
   container.innerHTML =
-    state.bestFriends
+    allBestFriends
       .map(item =>
         createFriendCard(
           item,
@@ -1812,49 +1987,36 @@ function renderBestFriends() {
       .join("");
 }
 
+
 /* =========================================================
    REQUEST CARD
 ========================================================= */
 
-function createRequestCard(
+function requestUserCard(
+  user,
   request,
-  incoming
+  incoming = true
 ) {
-  const user =
-    request.user;
-
-  if (!user) return "";
+  if (!user) {
+    return "";
+  }
 
   return `
-    <article class="request-card">
+    <div class="request-card">
 
       <div class="request-user">
 
         <div class="friend-avatar">
-          ${
-            user.avatar_url
-              ? `
-                <img
-                  src="${escapeHTML(
-                    user.avatar_url
-                  )}"
-                  alt="${escapeHTML(
-                    user.name
-                  )}"
-                >
-              `
-              : escapeHTML(
-                  initials(user.name)
-                )
-          }
+          ${escapeHTML(
+            initials(user.name)
+          )}
         </div>
 
         <div class="request-user-info">
 
           <strong>
             ${escapeHTML(
-              user.name ||
-              "Friend"
+              user.name
             )}
           </strong>
 
@@ -1913,289 +2075,372 @@ function createRequestCard(
 
       </div>
 
-    </article>
+    </div>
   `;
 }
 
+
 /* =========================================================
-   RENDER REQUESTS
+   REQUEST RENDERING
 ========================================================= */
 
-function renderRequests() {
-  const received =
+function renderIncomingRequests() {
+  const container =
     byId("receivedRequestsContainer");
 
-  const sent =
+  if (!container) {
+    return;
+  }
+
+  if (!allIncomingRequests.length) {
+    container.innerHTML = `
+      <div class="empty-state compact">
+
+        <div class="empty-icon">
+          ✓
+        </div>
+
+        <h4>
+          No incoming requests
+        </h4>
+
+        <p>
+          You don't have any pending
+          friend requests right now.
+        </p>
+
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    allIncomingRequests
+      .map(request =>
+        requestUserCard(
+          request.sender,
+          request,
+          true
+        )
+      )
+      .join("");
+}
+
+
+function renderOutgoingRequests() {
+  const container =
     byId("sentRequestsContainer");
 
-  if (received) {
-    if (!state.receivedRequests.length) {
-      received.innerHTML = `
-        <div class="empty-state compact">
-
-          <div class="empty-icon">
-            ✓
-          </div>
-
-          <h4>
-            No incoming requests
-          </h4>
-
-          <p>
-            New friend requests will appear here.
-          </p>
-
-        </div>
-      `;
-    } else {
-      received.innerHTML =
-        state.receivedRequests
-          .map(request =>
-            createRequestCard(
-              request,
-              true
-            )
-          )
-          .join("");
-    }
+  if (!container) {
+    return;
   }
 
-  if (sent) {
-    if (!state.sentRequests.length) {
-      sent.innerHTML = `
-        <div class="empty-state compact">
+  if (!allOutgoingRequests.length) {
+    container.innerHTML = `
+      <div class="empty-state compact">
 
-          <div class="empty-icon">
-            →
-          </div>
-
-          <h4>
-            No sent requests
-          </h4>
-
-          <p>
-            Friend requests you send will appear here.
-          </p>
-
+        <div class="empty-icon">
+          →
         </div>
-      `;
-    } else {
-      sent.innerHTML =
-        state.sentRequests
-          .map(request =>
-            createRequestCard(
-              request,
-              false
-            )
-          )
-          .join("");
-    }
+
+        <h4>
+          No sent requests
+        </h4>
+
+        <p>
+          Friend requests you send
+          will appear here.
+        </p>
+
+      </div>
+    `;
+
+    return;
   }
+
+  container.innerHTML =
+    allOutgoingRequests
+      .map(request =>
+        requestUserCard(
+          request.receiver,
+          request,
+          false
+        )
+      )
+      .join("");
 }
+
 
 /* =========================================================
-   COUNTS
+   REQUEST COUNTS
 ========================================================= */
 
-function updateCounts() {
-  const friends =
-    state.friends.length;
+function updateRequestCounts() {
+  const incoming =
+    allIncomingRequests.length;
 
-  const requests =
-    state.receivedRequests.length;
+  const outgoing =
+    allOutgoingRequests.length;
 
-  const best =
-    state.bestFriends.length;
+  const elements = [
+    ["receivedCount", incoming],
+    ["sentCount", outgoing],
+    ["requestsBadge", incoming],
+    ["headerRequestBadge", incoming],
+    ["homeRequestsCount", incoming]
+  ];
 
-  const sent =
-    state.sentRequests.length;
+  elements.forEach(
+    ([id, value]) => {
+      const element =
+        byId(id);
 
-  const values = {
-    friendsBadge: requests,
-    requestsBadge: requests,
-    headerRequestBadge: requests,
-
-    homeFriendsCount: friends,
-    homeRequestsCount: requests,
-    homeBestFriendsCount: best,
-
-    receivedCount: requests,
-    sentCount: sent
-  };
-
-  Object.entries(values)
-    .forEach(
-      ([id, value]) => {
-        const element =
-          byId(id);
-
-        if (element) {
-          element.textContent =
-            value;
-        }
+      if (element) {
+        element.textContent =
+          value;
       }
-    );
+    }
+  );
 
-  [
-    "friendsBadge",
-    "requestsBadge",
-    "headerRequestBadge"
-  ].forEach(id => {
-    const element =
-      byId(id);
+  const badge =
+    byId("requestsBadge");
 
-    if (!element) return;
-
-    element.classList.toggle(
+  if (badge) {
+    badge.classList.toggle(
       "hidden",
-      Number(element.textContent) === 0
+      incoming === 0
     );
-  });
+  }
+
+  const headerBadge =
+    byId("headerRequestBadge");
+
+  if (headerBadge) {
+    headerBadge.classList.toggle(
+      "hidden",
+      incoming === 0
+    );
+  }
 }
+
 
 /* =========================================================
    UPDATE UI
 ========================================================= */
 
 function updateUI() {
-  if (!state.user) return;
+  if (!currentProfile) {
+    return;
+  }
 
-  renderProfile();
-  updateCounts();
+  const name =
+    currentProfile.name ||
+    "FriendZone User";
 
-  const homeFriendID =
+  const friendID =
+    currentProfile.friend_id ||
+    "------";
+
+  const friendsCount =
+    allFriends.length;
+
+  const bestCount =
+    allBestFriends.length;
+
+  const requestsCount =
+    allIncomingRequests.length;
+
+  const username =
+    currentUser?.user_metadata?.username ||
+    "";
+
+
+  /* Sidebar */
+
+  const sidebarName =
+    byId("sidebarUserName");
+
+  if (sidebarName) {
+    sidebarName.textContent =
+      name;
+  }
+
+
+  const sidebarID =
+    byId("sidebarFriendId");
+
+  if (sidebarID) {
+    sidebarID.textContent =
+      friendID;
+  }
+
+
+  const sidebarAvatar =
+    byId("sidebarAvatar");
+
+  if (sidebarAvatar) {
+    sidebarAvatar.textContent =
+      initials(name);
+  }
+
+
+  /* Home */
+
+  byId("homeFriendsCount")
+    ?.replaceChildren(
+      document.createTextNode(
+        friendsCount
+      )
+    );
+
+  byId("homeRequestsCount")
+    ?.replaceChildren(
+      document.createTextNode(
+        requestsCount
+      )
+    );
+
+  byId("homeBestFriendsCount")
+    ?.replaceChildren(
+      document.createTextNode(
+        bestCount
+      )
+    );
+
+  const homeID =
     byId("homeFriendId");
 
-  if (homeFriendID) {
-    homeFriendID.textContent =
-      getFriendID();
+  if (homeID) {
+    homeID.textContent =
+      friendID;
   }
 
-  const homeFriends =
-    byId("homeFriendsCount");
 
-  if (homeFriends) {
-    homeFriends.textContent =
-      state.friends.length;
+  /* Profile */
+
+  const profileName =
+    byId("profileName");
+
+  if (profileName) {
+    profileName.textContent =
+      name;
   }
 
-  const homeRequests =
-    byId("homeRequestsCount");
 
-  if (homeRequests) {
-    homeRequests.textContent =
-      state.receivedRequests.length;
+  const profileUsername =
+    byId("profileUsername");
+
+  if (profileUsername) {
+    profileUsername.textContent =
+      username
+        ? `@${username}`
+        : "@friendzone";
   }
 
-  const homeBest =
-    byId("homeBestFriendsCount");
 
-  if (homeBest) {
-    homeBest.textContent =
-      state.bestFriends.length;
+  const profileID =
+    byId("profileFriendId");
+
+  if (profileID) {
+    profileID.textContent =
+      friendID;
   }
+
+
+  const profileAvatar =
+    byId("profileAvatar");
+
+  if (profileAvatar) {
+    profileAvatar.textContent =
+      initials(name);
+  }
+
+
+  /* Inputs */
+
+  const nameInput =
+    byId("profileNameInput");
+
+  if (nameInput) {
+    nameInput.value =
+      name;
+  }
+
+
+  const usernameInput =
+    byId("profileUsernameInput");
+
+  if (
+    usernameInput &&
+    document.activeElement !== usernameInput
+  ) {
+    usernameInput.value =
+      username;
+  }
+
+
+  /* General */
+
+  $$(".user-name").forEach(
+    element => {
+      element.textContent =
+        name;
+    }
+  );
 }
 
-/* =========================================================
-   RENDER EVERYTHING
-========================================================= */
-
-function renderAll() {
-  renderProfile();
-  renderFriends();
-  renderRecentFriends();
-  renderBestFriends();
-  renderRequests();
-  updateCounts();
-  updateUI();
-}
 
 /* =========================================================
-   NAVIGATION
+   PAGE NAVIGATION
 ========================================================= */
 
-const PAGE_INFO = {
-  homePage: {
-    title: "Home",
-    subtitle: "Your FriendZone dashboard"
-  },
-
-  friendsPage: {
-    title: "Friends",
-    subtitle: "Manage your friends"
-  },
-
-  requestsPage: {
-    title: "Friend Requests",
-    subtitle: "Manage incoming and sent requests"
-  },
-
-  bestFriendsPage: {
-    title: "Best Friends",
-    subtitle: "Your optional closest-friend list"
-  },
-
-  addFriendPage: {
-    title: "Add Friend",
-    subtitle: "Connect using a Friend ID"
-  },
-
-  profilePage: {
-    title: "Profile",
-    subtitle: "Manage your FriendZone account"
+function showPage(pageName) {
+  if (!pageName) {
+    return;
   }
-};
-
-function showPage(pageID) {
-  if (!pageID) return;
 
   const page =
-    byId(pageID);
+    byId(pageName);
 
-  if (!page) return;
+  if (!page) {
+    return;
+  }
 
-  $$(".page")
-    .forEach(item => {
+  $$(".page").forEach(
+    item => {
       item.classList.remove(
         "active-page"
       );
-    });
+    }
+  );
 
   page.classList.add(
     "active-page"
   );
 
-  $$(".nav-item")
-    .forEach(item => {
-      item.classList.toggle(
-        "active",
-        item.dataset.page === pageID
+
+  $$(".nav-item").forEach(
+    item => {
+      item.classList.remove(
+        "active"
       );
-    });
 
-  state.currentPage =
-    pageID;
-
-  const info =
-    PAGE_INFO[pageID];
-
-  if (info) {
-    const title =
-      byId("currentPageTitle");
-
-    const subtitle =
-      byId("currentPageSubtitle");
-
-    if (title) {
-      title.textContent =
-        info.title;
+      if (
+        item.dataset.page ===
+        pageName
+      ) {
+        item.classList.add(
+          "active"
+        );
+      }
     }
+  );
 
-    if (subtitle) {
-      subtitle.textContent =
-        info.subtitle;
-    }
-  }
+
+  updatePageHeader(
+    pageName
+  );
 
   closeSidebar();
 
@@ -2204,6 +2449,69 @@ function showPage(pageID) {
     behavior: "smooth"
   });
 }
+
+
+/* =========================================================
+   PAGE HEADER
+========================================================= */
+
+function updatePageHeader(pageName) {
+  const titles = {
+    homePage: [
+      "Home",
+      "Your FriendZone dashboard"
+    ],
+
+    friendsPage: [
+      "Friends",
+      "Manage your friends"
+    ],
+
+    requestsPage: [
+      "Friend Requests",
+      "Manage your incoming and sent requests"
+    ],
+
+    bestFriendsPage: [
+      "Best Friends",
+      "Your optional closest-friend list"
+    ],
+
+    addFriendPage: [
+      "Add Friend",
+      "Connect using a Friend ID"
+    ],
+
+    profilePage: [
+      "Profile",
+      "Manage your FriendZone account"
+    ]
+  };
+
+  const info =
+    titles[pageName];
+
+  if (!info) {
+    return;
+  }
+
+  const title =
+    byId("currentPageTitle");
+
+  const subtitle =
+    byId("currentPageSubtitle");
+
+  if (title) {
+    title.textContent =
+      info[0];
+  }
+
+  if (subtitle) {
+    subtitle.textContent =
+      info[1];
+  }
+}
+
 
 /* =========================================================
    SIDEBAR
@@ -2217,6 +2525,7 @@ function openSidebar() {
     ?.classList.add("show");
 }
 
+
 function closeSidebar() {
   byId("sidebar")
     ?.classList.remove("open");
@@ -2225,320 +2534,76 @@ function closeSidebar() {
     ?.classList.remove("show");
 }
 
-/* =========================================================
-   PASSWORD TOGGLE
-========================================================= */
-
-function setupPasswordToggles() {
-  $$(".password-toggle")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          const target =
-            button.dataset.target;
-
-          const input =
-            byId(target);
-
-          if (!input) return;
-
-          if (
-            input.type === "password"
-          ) {
-            input.type = "text";
-            button.textContent = "◉";
-          } else {
-            input.type = "password";
-            button.textContent = "○";
-          }
-        }
-      );
-
-    });
-}
 
 /* =========================================================
-   LOGIN
+   BUTTON LOADING
 ========================================================= */
 
-async function login() {
-  if (!supabaseClient) return;
-
-  const email =
-    byId("loginEmail")
-      ?.value.trim();
-
-  const password =
-    byId("loginPassword")
-      ?.value;
-
-  if (!email || !password) {
-    showToast(
-      "Enter your email and password.",
-      "warning"
-    );
+function setButtonLoading(
+  button,
+  loading
+) {
+  if (!button) {
     return;
   }
 
-  const button =
-    byId("loginForm")
-      ?.querySelector(
-        "button[type='submit']"
-      );
+  button.disabled =
+    loading;
 
-  setButtonLoading(button, true);
-
-  try {
-    const { data, error } =
-      await supabaseClient.auth
-        .signInWithPassword({
-          email,
-          password
-        });
-
-    if (error) {
-      throw error;
-    }
-
-    state.user =
-      data.user;
-
-    await loadApplication(
-      data.user
-    );
-
-    showToast(
-      "Welcome back to FriendZone!",
-      "success"
-    );
-
-  } catch (error) {
-    console.error(
-      "Login:",
-      error
-    );
-
-    showToast(
-      error.message ||
-      "Login failed.",
-      "error"
-    );
-
-  } finally {
-    setButtonLoading(
-      button,
-      false
-    );
-  }
-}
-
-/* =========================================================
-   SIGN UP
-========================================================= */
-
-async function signUp() {
-  if (!supabaseClient) return;
-
-  const name =
-    byId("signupName")
-      ?.value.trim();
-
-  const username =
-    byId("signupUsername")
-      ?.value.trim();
-
-  const email =
-    byId("signupEmail")
-      ?.value.trim();
-
-  const password =
-    byId("signupPassword")
-      ?.value;
-
-  if (!name || !email || !password) {
-    showToast(
-      "Please fill all required fields.",
-      "warning"
-    );
-    return;
-  }
-
-  if (password.length < 6) {
-    showToast(
-      "Password must contain at least 6 characters.",
-      "warning"
-    );
-    return;
-  }
-
-  const button =
-    byId("signupForm")
-      ?.querySelector(
-        "button[type='submit']"
-      );
-
-  setButtonLoading(
-    button,
-    true
-  );
-
-  try {
-    const { data, error } =
-      await supabaseClient.auth
-        .signUp({
-          email,
-          password,
-
-          options: {
-            data: {
-              name,
-              username
-            }
-          }
-        });
-
-    if (error) {
-      throw error;
-    }
-
-    if (data.session) {
-
-      state.user =
-        data.user;
-
-      await loadApplication(
-        data.user
-      );
-
-      showToast(
-        "Welcome to FriendZone!",
-        "success"
-      );
-
-    } else {
-
-      showToast(
-        "Account created. Please verify your email if verification is enabled.",
-        "success"
-      );
-
-      switchAuthMode(
-        "login"
-      );
-    }
-
-  } catch (error) {
-    console.error(
-      "Signup:",
-      error
-    );
-
-    showToast(
-      error.message ||
-      "Unable to create account.",
-      "error"
-    );
-
-  } finally {
-    setButtonLoading(
-      button,
-      false
-    );
-  }
-}
-
-/* =========================================================
-   LOGOUT
-========================================================= */
-
-async function logout() {
-  try {
-    if (supabaseClient) {
-      await supabaseClient.auth
-        .signOut();
-    }
-  } catch (error) {
-    console.error(error);
-  }
-
-  cleanupRealtime();
-
-  state.user = null;
-  state.profile = null;
-  state.friends = [];
-  state.receivedRequests = [];
-  state.sentRequests = [];
-  state.bestFriends = [];
-
-  showAuthScreen();
-  switchAuthMode("login");
-
-  showToast(
-    "You have been logged out.",
-    "success"
+  button.classList.toggle(
+    "btn-loading",
+    loading
   );
 }
 
+
 /* =========================================================
-   LOAD APPLICATION
+   PASSWORD VISIBILITY
 ========================================================= */
 
-async function loadApplication(user) {
-  if (!user) return;
+function togglePassword(
+  inputID,
+  button
+) {
+  const input =
+    byId(inputID);
 
-  state.user = user;
+  if (!input) {
+    return;
+  }
 
-  showMainApp();
+  if (
+    input.type ===
+    "password"
+  ) {
+    input.type = "text";
 
-  try {
-    await loadProfile();
+    if (button) {
+      button.textContent =
+        "◉";
+    }
 
-    await Promise.all([
-      loadFriends(),
-      loadFriendRequests(),
-      loadBestFriends()
-    ]);
+  } else {
+    input.type =
+      "password";
 
-    renderAll();
-
-    setupRealtime();
-
-  } catch (error) {
-    console.error(
-      "Application:",
-      error
-    );
+    if (button) {
+      button.textContent =
+        "○";
+    }
   }
 }
 
-/* =========================================================
-   REFRESH EVERYTHING
-========================================================= */
-
-async function refreshEverything() {
-  if (!state.user) return;
-
-  await loadProfile();
-
-  await Promise.all([
-    loadFriends(),
-    loadFriendRequests(),
-    loadBestFriends()
-  ]);
-
-  renderAll();
-}
 
 /* =========================================================
-   FRIEND SEARCH FILTER
+   FRIEND SEARCH
 ========================================================= */
 
-function filterFriends(value) {
-  const search =
-    String(value || "")
+function filterFriends(
+  searchValue
+) {
+  const value =
+    String(searchValue || "")
       .trim()
       .toLowerCase();
 
@@ -2557,15 +2622,324 @@ function filterFriends(value) {
           ""
         ).toLowerCase();
 
-      const matches =
-        !search ||
-        name.includes(search) ||
-        id.includes(search);
+      const visible =
+        !value ||
+        name.includes(value) ||
+        id.includes(value);
 
       card.style.display =
-        matches ? "" : "none";
+        visible
+          ? ""
+          : "none";
     });
 }
+
+
+/* =========================================================
+   EVENT DELEGATION
+========================================================= */
+
+document.addEventListener(
+  "click",
+  async event => {
+
+    const nav =
+      event.target.closest(
+        ".nav-item"
+      );
+
+    if (
+      nav &&
+      nav.dataset.page
+    ) {
+      showPage(
+        nav.dataset.page
+      );
+
+      return;
+    }
+
+
+    const goPage =
+      event.target.closest(
+        "[data-go-page]"
+      );
+
+    if (
+      goPage &&
+      goPage.dataset.goPage
+    ) {
+      showPage(
+        goPage.dataset.goPage
+      );
+
+      return;
+    }
+
+
+    const pageButton =
+      event.target.closest(
+        "[data-page]"
+      );
+
+    if (
+      pageButton &&
+      pageButton.dataset.page
+    ) {
+      showPage(
+        pageButton.dataset.page
+      );
+
+      return;
+    }
+
+
+    const action =
+      event.target.closest(
+        "[data-action]"
+      );
+
+    if (!action) {
+      return;
+    }
+
+    const type =
+      action.dataset.action;
+
+
+    if (
+      type ===
+      "remove-friend"
+    ) {
+      await removeFriend(
+        action.dataset.userId
+      );
+      return;
+    }
+
+
+    if (
+      type ===
+      "best-friend"
+    ) {
+      await addBestFriend(
+        action.dataset.userId
+      );
+      return;
+    }
+
+
+    if (
+      type ===
+      "remove-best"
+    ) {
+      await removeBestFriend(
+        action.dataset.userId
+      );
+      return;
+    }
+
+
+    if (
+      type ===
+      "accept-request"
+    ) {
+      await acceptFriendRequest(
+        action.dataset.requestId
+      );
+      return;
+    }
+
+
+    if (
+      type ===
+      "reject-request"
+    ) {
+      await rejectFriendRequest(
+        action.dataset.requestId
+      );
+      return;
+    }
+
+
+    if (
+      type ===
+      "cancel-request"
+    ) {
+      await cancelFriendRequest(
+        action.dataset.requestId
+      );
+      return;
+    }
+  }
+);
+
+
+/* =========================================================
+   AUTH EVENTS
+========================================================= */
+
+function setupAuthEvents() {
+
+  byId("loginForm")
+    ?.addEventListener(
+      "submit",
+      event => {
+        event.preventDefault();
+        login();
+      }
+    );
+
+
+  byId("signupForm")
+    ?.addEventListener(
+      "submit",
+      event => {
+        event.preventDefault();
+        signUp();
+      }
+    );
+
+
+  byId("showSignupBtn")
+    ?.addEventListener(
+      "click",
+      () =>
+        switchAuthMode(
+          "signup"
+        )
+    );
+
+
+  byId("showLoginBtn")
+    ?.addEventListener(
+      "click",
+      () =>
+        switchAuthMode(
+          "login"
+        )
+    );
+
+
+  byId("loginBtn")
+    ?.addEventListener(
+      "click",
+      login
+    );
+
+
+  byId("signupBtn")
+    ?.addEventListener(
+      "click",
+      signUp
+    );
+
+
+  byId("logoutBtn")
+    ?.addEventListener(
+      "click",
+      logout
+    );
+
+
+  byId("openSidebarBtn")
+    ?.addEventListener(
+      "click",
+      openSidebar
+    );
+
+
+  byId("closeSidebarBtn")
+    ?.addEventListener(
+      "click",
+      closeSidebar
+    );
+
+
+  byId("sidebarOverlay")
+    ?.addEventListener(
+      "click",
+      closeSidebar
+    );
+
+
+  byId("headerRequestBtn")
+    ?.addEventListener(
+      "click",
+      () =>
+        showPage(
+          "requestsPage"
+        )
+    );
+
+
+  byId("headerProfileBtn")
+    ?.addEventListener(
+      "click",
+      () =>
+        showPage(
+          "profilePage"
+        )
+    );
+
+
+  byId("copyFriendIdBtn")
+    ?.addEventListener(
+      "click",
+      copyFriendID
+    );
+
+
+  byId("addFriendForm")
+    ?.addEventListener(
+      "submit",
+      event => {
+        event.preventDefault();
+        searchFriendID();
+      }
+    );
+
+
+  byId("profileForm")
+    ?.addEventListener(
+      "submit",
+      event => {
+        event.preventDefault();
+        updateProfile();
+      }
+    );
+
+
+  byId("friendsSearch")
+    ?.addEventListener(
+      "input",
+      event =>
+        filterFriends(
+          event.target.value
+        )
+    );
+
+
+  $$(".password-toggle")
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          const target =
+            button.dataset.target;
+
+          togglePassword(
+            target,
+            button
+          );
+        }
+      );
+
+    });
+}
+
 
 /* =========================================================
    REQUEST TABS
@@ -2582,18 +2956,24 @@ function setupRequestTabs() {
           const target =
             tab.dataset.requestTab;
 
-          if (!target) return;
+          if (!target) {
+            return;
+          }
 
-          state.requestTab =
+          currentRequestTab =
             target;
 
           $$(".request-tab")
             .forEach(item => {
-              item.classList.toggle(
-                "active",
-                item === tab
+              item.classList.remove(
+                "active"
               );
             });
+
+          tab.classList.add(
+            "active"
+          );
+
 
           const received =
             byId(
@@ -2605,17 +2985,27 @@ function setupRequestTabs() {
               "sentRequestsContainer"
             );
 
-          if (received) {
-            received.classList.toggle(
-              "hidden",
-              target !== "received"
-            );
-          }
 
-          if (sent) {
-            sent.classList.toggle(
-              "hidden",
-              target !== "sent"
+          if (
+            target ===
+            "received"
+          ) {
+            received?.classList.remove(
+              "hidden"
+            );
+
+            sent?.classList.add(
+              "hidden"
+            );
+
+          } else {
+
+            received?.classList.add(
+              "hidden"
+            );
+
+            sent?.classList.remove(
+              "hidden"
             );
           }
         }
@@ -2624,434 +3014,63 @@ function setupRequestTabs() {
     });
 }
 
+
 /* =========================================================
-   REALTIME
+   AUTH INITIALIZATION
 ========================================================= */
 
-function cleanupRealtime() {
-  if (!supabaseClient) return;
+let authInitializing = true;
 
-  state.realtimeChannels
-    .forEach(channel => {
-      try {
-        supabaseClient.removeChannel(
-          channel
-        );
-      } catch {}
-    });
 
-  state.realtimeChannels = [];
-}
-
-function setupRealtime() {
-  if (!supabaseClient || !state.user) {
-    return;
-  }
-
-  cleanupRealtime();
+async function initializeAuth() {
 
   try {
-    const channel =
-      supabaseClient
-        .channel(
-          `friendzone-${state.user.id}`
-        )
 
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "friend_requests",
-            filter:
-              `receiver_id=eq.${state.user.id}`
-          },
-          async () => {
-            await loadFriendRequests();
-            renderAll();
-          }
-        )
+    const {
+      data,
+      error
+    } =
+      await supabaseClient.auth
+        .getSession();
 
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "friend_requests",
-            filter:
-              `sender_id=eq.${state.user.id}`
-          },
-          async () => {
-            await loadFriendRequests();
-            renderAll();
-          }
-        )
+    if (error) {
+      console.error(
+        "Session error:",
+        error
+      );
+    }
 
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "friendships",
-            filter:
-              `user_id=eq.${state.user.id}`
-          },
-          async () => {
-            await loadFriends();
-            renderAll();
-          }
-        )
 
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "best_friends",
-            filter:
-              `user_id=eq.${state.user.id}`
-          },
-          async () => {
-            await loadBestFriends();
-            renderAll();
-          }
-        )
+    if (
+      data?.session?.user
+    ) {
 
-        .subscribe();
+      await loadApplication(
+        data.session.user
+      );
 
-    state.realtimeChannels
-      .push(channel);
+    } else {
+
+      showAuthScreen();
+
+    }
+
 
   } catch (error) {
-    console.warn(
-      "Realtime unavailable:",
+
+    console.error(
+      "Authentication initialization error:",
       error
     );
+
+    showAuthScreen();
+
+  } finally {
+
+    authInitializing =
+      false;
   }
-}
 
-/* =========================================================
-   EVENT SETUP
-========================================================= */
-
-function setupEvents() {
-
-  /* LOGIN */
-
-  byId("loginForm")
-    ?.addEventListener(
-      "submit",
-      event => {
-        event.preventDefault();
-        login();
-      }
-    );
-
-  /* SIGNUP */
-
-  byId("signupForm")
-    ?.addEventListener(
-      "submit",
-      event => {
-        event.preventDefault();
-        signUp();
-      }
-    );
-
-  /* AUTH SWITCH */
-
-  byId("showSignupBtn")
-    ?.addEventListener(
-      "click",
-      () => switchAuthMode("signup")
-    );
-
-  byId("showLoginBtn")
-    ?.addEventListener(
-      "click",
-      () => switchAuthMode("login")
-    );
-
-  /* LOGOUT */
-
-  byId("logoutBtn")
-    ?.addEventListener(
-      "click",
-      logout
-    );
-
-  /* SIDEBAR */
-
-  byId("openSidebarBtn")
-    ?.addEventListener(
-      "click",
-      openSidebar
-    );
-
-  byId("closeSidebarBtn")
-    ?.addEventListener(
-      "click",
-      closeSidebar
-    );
-
-  byId("sidebarOverlay")
-    ?.addEventListener(
-      "click",
-      closeSidebar
-    );
-
-  /* HEADER REQUEST */
-
-  byId("headerRequestBtn")
-    ?.addEventListener(
-      "click",
-      () => showPage("requestsPage")
-    );
-
-  /* HEADER PROFILE */
-
-  byId("headerProfileBtn")
-    ?.addEventListener(
-      "click",
-      () => showPage("profilePage")
-    );
-
-  /* COPY FRIEND ID */
-
-  byId("copyFriendIdBtn")
-    ?.addEventListener(
-      "click",
-      copyFriendID
-    );
-
-  /* ADD FRIEND */
-
-  byId("addFriendForm")
-    ?.addEventListener(
-      "submit",
-      event => {
-        event.preventDefault();
-        searchFriend();
-      }
-    );
-
-  /* PROFILE */
-
-  byId("profileForm")
-    ?.addEventListener(
-      "submit",
-      event => {
-        event.preventDefault();
-        updateProfile();
-      }
-    );
-
-  /* FRIEND SEARCH */
-
-  byId("friendsSearch")
-    ?.addEventListener(
-      "input",
-      event => {
-        filterFriends(
-          event.target.value
-        );
-      }
-    );
-
-  /* GO PAGE BUTTONS */
-
-  $$("[data-go-page]")
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        () => {
-          showPage(
-            button.dataset.goPage
-          );
-        }
-      );
-    });
-
-  /* MODAL CLOSE */
-
-  $$("[data-close-modal]")
-    .forEach(element => {
-      element.addEventListener(
-        "click",
-        () => {
-          const modal =
-            element.closest(".modal");
-
-          modal?.classList.add(
-            "hidden"
-          );
-        }
-      );
-    });
-}
-
-/* =========================================================
-   CLICK DELEGATION
-========================================================= */
-
-document.addEventListener(
-  "click",
-  async event => {
-
-    /* NAVIGATION */
-
-    const nav =
-      event.target.closest(
-        ".nav-item"
-      );
-
-    if (nav?.dataset.page) {
-      showPage(
-        nav.dataset.page
-      );
-      return;
-    }
-
-    /* QUICK PAGE */
-
-    const go =
-      event.target.closest(
-        "[data-go-page]"
-      );
-
-    if (go?.dataset.goPage) {
-      showPage(
-        go.dataset.goPage
-      );
-      return;
-    }
-
-    /* ACTION */
-
-    const action =
-      event.target.closest(
-        "[data-action]"
-      );
-
-    if (!action) return;
-
-    const type =
-      action.dataset.action;
-
-    const userID =
-      action.dataset.userId;
-
-    const requestID =
-      action.dataset.requestId;
-
-    if (
-      type === "remove-friend"
-    ) {
-      await removeFriend(
-        userID
-      );
-      return;
-    }
-
-    if (
-      type === "best-friend"
-    ) {
-      await addBestFriend(
-        userID
-      );
-      return;
-    }
-
-    if (
-      type === "remove-best"
-    ) {
-      await removeBestFriend(
-        userID
-      );
-      return;
-    }
-
-    if (
-      type === "accept-request"
-    ) {
-      await acceptFriendRequest(
-        requestID
-      );
-      return;
-    }
-
-    if (
-      type === "reject-request"
-    ) {
-      await rejectFriendRequest(
-        requestID
-      );
-      return;
-    }
-
-    if (
-      type === "cancel-request"
-    ) {
-      await cancelFriendRequest(
-        requestID
-      );
-    }
-  }
-);
-
-/* =========================================================
-   MODAL BACKDROP
-========================================================= */
-
-document.addEventListener(
-  "click",
-  event => {
-
-    const modal =
-      event.target.closest(
-        ".modal"
-      );
-
-    if (
-      modal &&
-      event.target === modal
-    ) {
-      modal.classList.add(
-        "hidden"
-      );
-    }
-  }
-);
-
-/* =========================================================
-   ESCAPE KEY
-========================================================= */
-
-document.addEventListener(
-  "keydown",
-  event => {
-
-    if (event.key !== "Escape") {
-      return;
-    }
-
-    closeSidebar();
-
-    $$(".modal")
-      .forEach(modal => {
-        modal.classList.add(
-          "hidden"
-        );
-      });
-  }
-);
-
-/* =========================================================
-   AUTH STATE LISTENER
-========================================================= */
-
-function setupAuthListener() {
-  if (!supabaseClient) return;
 
   supabaseClient.auth
     .onAuthStateChange(
@@ -3061,15 +3080,15 @@ function setupAuthListener() {
       ) => {
 
         if (
-          event === "INITIAL_SESSION"
+          authInitializing
         ) {
           return;
         }
 
-        if (session?.user) {
 
-          state.user =
-            session.user;
+        if (
+          session?.user
+        ) {
 
           await loadApplication(
             session.user
@@ -3077,15 +3096,16 @@ function setupAuthListener() {
 
         } else {
 
-          cleanupRealtime();
+          currentUser =
+            null;
 
-          state.user = null;
-          state.profile = null;
+          currentProfile =
+            null;
 
-          state.friends = [];
-          state.receivedRequests = [];
-          state.sentRequests = [];
-          state.bestFriends = [];
+          allFriends = [];
+          allIncomingRequests = [];
+          allOutgoingRequests = [];
+          allBestFriends = [];
 
           showAuthScreen();
         }
@@ -3093,161 +3113,190 @@ function setupAuthListener() {
     );
 }
 
+
 /* =========================================================
-   SAFE SESSION WITH TIMEOUT
+   REALTIME
 ========================================================= */
 
-async function getInitialSession() {
-  if (!supabaseClient) {
-    return null;
+let realtimeChannels = [];
+
+
+function setupRealtime() {
+
+  if (!currentUser) {
+    return;
   }
+
+  realtimeChannels.forEach(
+    channel => {
+      try {
+        supabaseClient.removeChannel(
+          channel
+        );
+      } catch {}
+    }
+  );
+
+  realtimeChannels = [];
+
 
   try {
 
-    const sessionPromise =
-      supabaseClient.auth
-        .getSession();
+    const requestChannel =
+      supabaseClient
+        .channel(
+          `friendzone-request-${currentUser.id}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "friend_requests",
+            filter:
+              `receiver_id=eq.${currentUser.id}`
+          },
+          async () => {
+            await loadFriendRequests();
+            updateRequestCounts();
+          }
+        )
+        .subscribe();
 
-    const timeoutPromise =
-      new Promise(
-        (_, reject) => {
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  "Supabase connection timeout"
-                )
-              ),
-            10000
-          );
-        }
-      );
-
-    const result =
-      await Promise.race([
-        sessionPromise,
-        timeoutPromise
-      ]);
-
-    return (
-      result?.data?.session ||
-      null
+    realtimeChannels.push(
+      requestChannel
     );
 
   } catch (error) {
-
     console.error(
-      "Session:",
+      "Realtime request error:",
       error
     );
-
-    return null;
   }
-}
 
-/* =========================================================
-   INITIALIZATION
-========================================================= */
-
-async function initializeApp() {
 
   try {
 
-    /* Check Supabase */
+    const friendChannel =
+      supabaseClient
+        .channel(
+          `friendzone-friend-${currentUser.id}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "friendships",
+            filter:
+              `user_id=eq.${currentUser.id}`
+          },
+          async () => {
+            await loadFriends();
+            updateUI();
+          }
+        )
+        .subscribe();
+
+    realtimeChannels.push(
+      friendChannel
+    );
+
+  } catch (error) {
+    console.error(
+      "Realtime friend error:",
+      error
+    );
+  }
+
+
+  try {
+
+    const bestChannel =
+      supabaseClient
+        .channel(
+          `friendzone-best-${currentUser.id}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "best_friends",
+            filter:
+              `user_id=eq.${currentUser.id}`
+          },
+          async () => {
+            await loadBestFriends();
+            updateUI();
+          }
+        )
+        .subscribe();
+
+    realtimeChannels.push(
+      bestChannel
+    );
+
+  } catch (error) {
+    console.error(
+      "Realtime best-friend error:",
+      error
+    );
+  }
+}
+
+
+/* =========================================================
+   REFRESH EVERYTHING
+========================================================= */
+
+async function refreshEverything() {
+  if (!currentUser) {
+    return;
+  }
+
+  await Promise.allSettled([
+    loadProfile(),
+    loadFriends(),
+    loadFriendRequests(),
+    loadBestFriends()
+  ]);
+
+  updateUI();
+}
+
+
+/* =========================================================
+   KEYBOARD
+========================================================= */
+
+document.addEventListener(
+  "keydown",
+  event => {
 
     if (
-      !window.supabase ||
-      typeof window.supabase.createClient !==
-        "function"
+      event.key ===
+      "Escape"
     ) {
+      closeSidebar();
 
-      console.error(
-        "Supabase JS library was not loaded."
-      );
-
-      showAuthScreen();
-
-      showToast(
-        "Supabase library could not be loaded. Check your internet connection.",
-        "error"
-      );
-
-      return;
+      $$(".modal")
+        .forEach(modal => {
+          modal.classList.add(
+            "hidden"
+          );
+        });
     }
-
-    /* Create client */
-
-    supabaseClient =
-      window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
-      );
-
-    /* Setup UI events */
-
-    setupEvents();
-    setupPasswordToggles();
-    setupRequestTabs();
-
-    /* Auth listener */
-
-    setupAuthListener();
-
-    /* Get session */
-
-    const session =
-      await getInitialSession();
-
-    if (session?.user) {
-
-      state.user =
-        session.user;
-
-      await loadApplication(
-        session.user
-      );
-
-    } else {
-
-      showAuthScreen();
-
-      switchAuthMode("login");
-    }
-
-    state.initialized = true;
-
-  } catch (error) {
-
-    console.error(
-      "FriendZone startup error:",
-      error
-    );
-
-    showAuthScreen();
-
-    showToast(
-      "FriendZone could not connect right now. Please refresh and try again.",
-      "error"
-    );
-
-  } finally {
-
-    /*
-      IMPORTANT:
-      The loader is ALWAYS removed.
-      This prevents the website from getting
-      permanently stuck on "Connecting your circle..."
-    */
-
-    hideLoader();
   }
-}
+);
+
 
 /* =========================================================
-   GLOBAL API
+   GLOBAL FUNCTIONS
 ========================================================= */
 
 window.FriendZone = {
+
   login,
   signUp,
   logout,
@@ -3264,7 +3313,7 @@ window.FriendZone = {
   addBestFriend,
   removeBestFriend,
 
-  searchFriend,
+  searchFriendID,
 
   copyFriendID,
 
@@ -3277,49 +3326,43 @@ window.FriendZone = {
   showToast
 };
 
+
 /* =========================================================
-   START
+   INITIALIZATION
 ========================================================= */
 
-if (
-  document.readyState ===
-  "loading"
-) {
+document.addEventListener(
+  "DOMContentLoaded",
+  async () => {
 
-  document.addEventListener(
-    "DOMContentLoaded",
-    initializeApp,
-    { once: true }
-  );
+    setupAuthEvents();
 
-} else {
+    setupRequestTabs();
 
-  initializeApp();
-}
+    await initializeAuth();
+
+    if (currentUser) {
+      setupRealtime();
+    }
+  }
+);
+
 
 /* =========================================================
-   GLOBAL ERROR PROTECTION
+   GLOBAL ERROR HANDLING
 ========================================================= */
 
 window.addEventListener(
   "unhandledrejection",
   event => {
+
     console.error(
-      "FriendZone Promise Error:",
+      "Unhandled Promise:",
       event.reason
     );
   }
 );
 
-window.addEventListener(
-  "error",
-  event => {
-    console.error(
-      "FriendZone Error:",
-      event.error || event.message
-    );
-  }
-);
 
 /* =========================================================
    END FRIENDZONE
